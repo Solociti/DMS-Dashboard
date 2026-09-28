@@ -7,7 +7,11 @@
     "build": "node ./scripts/build.mjs",
     "start": "node ./build/server/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "node ./scripts/build.mjs && node --test tests/**/*.test.js"
+    "test": "node ./scripts/build.mjs && node --test tests/**/*.test.js",
+    "dev": "docker compose -f docker-compose.dev.yml up --build",
+    "dev:container": "concurrently -n client,server -c blue,green \"npm:dev:client\" \"npm:dev:server\"",
+    "dev:client": "node ./scripts/dev-client.mjs",
+    "dev:server": "tsx watch server/src/index.ts"
   },
   "keywords": [
     "dms",
@@ -20,16 +24,18 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0",
+    "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
-    "knex": "^3.1.0",
+    "knex": "^3.3.0",
     "sqlite3": "6.0.1"
   },
   "devDependencies": {
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.5.2",
-    "@vercel/ncc": "^0.38.4",
-    "esbuild": "0.28.1",
-    "typescript": "5.9.2"
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.0",
+    "@vercel/ncc": "^0.45.0",
+    "concurrently": "^10.0.5",
+    "esbuild": "0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "7.0.2"
   }
 }

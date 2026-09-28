@@ -144,7 +144,7 @@ test('warning recheck clears override warning and installs the filter', async ()
   }
 });
 
-test('tracking pixel endpoint records opens and returns a gif', async () => {
+test('tracking pixel endpoint records opens and returns a png', async () => {
   const root = await makeTempDir();
   const dmsRoot = path.join(root, 'dms');
   const overrideDir = path.join(dmsRoot, 'rspamd', 'override.d');
@@ -156,8 +156,10 @@ test('tracking pixel endpoint records opens and returns a gif', async () => {
 
   await fs.mkdir(overrideDir, { recursive: true });
   await fs.mkdir(path.dirname(logPath), { recursive: true });
+  await fs.mkdir(path.join(publicDir, 'images'), { recursive: true });
   await fs.mkdir(publicDistDir, { recursive: true });
   await fs.writeFile(luaSource, '-- lua');
+  await fs.writeFile(path.join(publicDir, 'images', 'pixel.png'), Buffer.from('png-pixel'));
   await fs.writeFile(path.join(publicDistDir, 'index.html'), '<!doctype html><title>ok</title>');
   await fs.writeFile(logPath, 'first\nsecond\nthird\n');
 
@@ -189,7 +191,7 @@ test('tracking pixel endpoint records opens and returns a gif', async () => {
     });
 
     assert.equal(pixelResponse.status, 200);
-    assert.equal(pixelResponse.headers.get('content-type'), 'image/gif');
+    assert.equal(pixelResponse.headers.get('content-type'), 'image/png');
     assert.equal(pixelResponse.headers.get('cache-control'), 'no-store, no-cache, must-revalidate, private');
     assert.ok((await pixelResponse.arrayBuffer()).byteLength > 0);
 

@@ -5,6 +5,7 @@ public/dist
 coverage
 .env
 /data/
+/dms-root/
 .DS_Store
 npm-debug.log*
 pnpm-debug.log*

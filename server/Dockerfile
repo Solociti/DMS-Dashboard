@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS build
+FROM node:24-trixie-slim AS build
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -13,7 +13,19 @@ COPY tsconfig.json ./tsconfig.json
 RUN corepack enable && pnpm install --frozen-lockfile
 RUN pnpm run build
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-trixie-slim AS dev
+ENV NODE_ENV=development
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
+
+COPY . .
+
+EXPOSE 3000
+CMD ["pnpm", "run", "dev:container"]
+
+FROM node:24-trixie-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
