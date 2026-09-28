@@ -10,6 +10,21 @@ async function makeTempDir() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'dms-dashboard-'));
 }
 
+async function waitFor(check, timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const result = await check();
+    if (result) {
+      return result;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  throw new Error('Timed out waiting for condition');
+}
+
 test('ensureTrackingFilter aborts when override directory is missing', async () => {
   const root = await makeTempDir();
   const source = path.join(root, 'email_tracking.lua');
@@ -19,6 +34,21 @@ test('ensureTrackingFilter aborts when override directory is missing', async () 
     () => ensureTrackingFilter(path.join(root, 'missing-dms'), source),
     /Required Rspamd override directory is missing/
   );
+});
+
+test('ensureTrackingFilter does not overwrite an existing filter file', async () => {
+  const root = await makeTempDir();
+  const dmsRoot = path.join(root, 'dms');
+  const overrideDir = path.join(dmsRoot, 'rspamd', 'override.d');
+  const source = path.join(root, 'email_tracking.lua');
+  const target = path.join(overrideDir, 'email_tracking.lua');
+
+  await fs.mkdir(overrideDir, { recursive: true });
+  await fs.writeFile(source, '-- new lua');
+  await fs.writeFile(target, '-- existing lua');
+
+  await ensureTrackingFilter(dmsRoot, source);
+  assert.equal(await fs.readFile(target, 'utf8'), '-- existing lua');
 });
 
 test('tracking pixel endpoint records opens and returns a gif', async () => {
@@ -70,12 +100,20 @@ test('tracking pixel endpoint records opens and returns a gif', async () => {
     assert.equal(pixelResponse.headers.get('cache-control'), 'no-store, no-cache, must-revalidate, private');
     assert.ok((await pixelResponse.arrayBuffer()).byteLength > 0);
 
-    const summaries = await (await fetch(`${baseUrl}/api/opens`)).json();
+    const summaries = await waitFor(async () => {
+      const response = await fetch(`${baseUrl}/api/opens`);
+      const payload = await response.json();
+      return payload.length ? payload : null;
+    });
     assert.equal(summaries.length, 1);
     assert.equal(summaries[0].msgId, 'message-123');
     assert.equal(summaries[0].totalOpens, 1);
 
-    const entries = await (await fetch(`${baseUrl}/api/opens/message-123`)).json();
+    const entries = await waitFor(async () => {
+      const response = await fetch(`${baseUrl}/api/opens/message-123`);
+      const payload = await response.json();
+      return payload.length ? payload : null;
+    });
     assert.equal(entries.length, 1);
     assert.equal(entries[0].ipAddress, '203.0.113.10');
     assert.equal(entries[0].userAgent, 'Node Test Agent');

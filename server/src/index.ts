@@ -23,13 +23,17 @@ export async function startServer(config: AppConfig = loadConfig()): Promise<{ s
   const { app, database } = await createServerApplication(config);
 
   return new Promise((resolve, reject) => {
+    const rejectWithCleanup = (error: Error) => {
+      void database.destroy().finally(() => reject(error));
+    };
+
     const server = app.listen(config.port, () => {
-      server.off('error', reject);
+      server.off('error', rejectWithCleanup);
       console.log(`DMS Dashboard listening on ${config.port}`);
       resolve({ server, database });
     });
 
-    server.once('error', reject);
+    server.once('error', rejectWithCleanup);
   });
 }
 

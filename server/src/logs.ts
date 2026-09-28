@@ -61,7 +61,7 @@ export async function readLogFile(registry: LogRegistry, name: string, lines = 2
     throw new Error(`Unknown log file: ${name}`);
   }
 
-  const [logs] = await Promise.all([listLogFiles({ [name]: filePath })]);
+  const logs = await listLogFiles({ [name]: filePath });
 
   return {
     log: logs[0],

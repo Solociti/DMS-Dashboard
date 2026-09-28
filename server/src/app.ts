@@ -1,5 +1,6 @@
 import express, { type Request, type Response } from 'express';
 import path from 'node:path';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import type { Knex } from 'knex';
 
 import type { OpenLogEntry, OpenSummary } from '../../common/types';
@@ -8,11 +9,6 @@ import { listLogFiles, readLogFile, type LogRegistry } from './logs';
 
 const TRANSPARENT_GIF = Buffer.from('R0lGODlhAQABAPAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64');
 const dashboardIndexPath = 'index.html';
-
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
 
 interface RawOpenRow {
   id: number;
@@ -45,28 +41,13 @@ export function getClientIp(request: Request): string | null {
 }
 
 function createRateLimiter(limit: number, windowMs: number): express.RequestHandler {
-  const entries = new Map<string, RateLimitEntry>();
-
-  return (request, response, next) => {
-    const now = Date.now();
-    const key = request.ip || request.socket.remoteAddress || 'unknown';
-    const current = entries.get(key);
-
-    if (!current || current.resetAt <= now) {
-      entries.set(key, { count: 1, resetAt: now + windowMs });
-      next();
-      return;
-    }
-
-    if (current.count >= limit) {
-      response.setHeader('Retry-After', String(Math.ceil((current.resetAt - now) / 1000)));
-      response.status(429).json({ error: 'Rate limit exceeded' });
-      return;
-    }
-
-    current.count += 1;
-    next();
-  };
+  return rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    keyGenerator: (request) => ipKeyGenerator(request.ip || request.socket.remoteAddress || '127.0.0.1')
+  });
 }
 
 async function getOpenSummaries(database: Knex): Promise<OpenSummary[]> {
@@ -107,17 +88,13 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
   app.set('trust proxy', config.trustProxy);
   app.use(express.json());
   app.use(express.static(config.publicRoot));
-  app.use('/open', openPixelLimiter);
-  app.use('/api/opens', opensApiLimiter);
-  app.use('/api/logs', logLimiter);
-  app.use('/dashboard', dashboardLimiter);
   app.use('/dashboard', express.static(config.publicDistRoot, { index: false }));
 
   app.get('/', (_request: Request, response: Response) => {
     response.redirect('/dashboard');
   });
 
-  app.get('/open/:msgId.png', async (request: Request, response: Response, next) => {
+  app.get('/open/:msgId.png', openPixelLimiter, async (request: Request, response: Response, next) => {
     try {
       const msgId = getRouteParam(request.params.msgId);
       if (!msgId) {
@@ -125,21 +102,23 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
         return;
       }
 
-      await database('opens').insert({
-        msg_id: msgId,
-        ip_address: getClientIp(request),
-        user_agent: request.header('user-agent') || null
-      });
-
       response.setHeader('Content-Type', 'image/gif');
       response.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       response.send(TRANSPARENT_GIF);
+
+      void database('opens').insert({
+        msg_id: msgId,
+        ip_address: getClientIp(request),
+        user_agent: request.header('user-agent') || null
+      }).catch((error: unknown) => {
+        console.error(error instanceof Error ? error.message : error);
+      });
     } catch (error) {
       next(error);
     }
   });
 
-  app.get('/api/opens', async (_request, response, next) => {
+  app.get('/api/opens', opensApiLimiter, async (_request, response, next) => {
     try {
       response.json(await getOpenSummaries(database));
     } catch (error) {
@@ -147,7 +126,7 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
     }
   });
 
-  app.get('/api/opens/:msgId', async (request, response, next) => {
+  app.get('/api/opens/:msgId', opensApiLimiter, async (request, response, next) => {
     try {
       const msgId = getRouteParam(request.params.msgId);
       if (!msgId) {
@@ -161,7 +140,7 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
     }
   });
 
-  app.get('/api/logs', async (_request, response, next) => {
+  app.get('/api/logs', logLimiter, async (_request, response, next) => {
     try {
       response.json(await listLogFiles(logRegistry));
     } catch (error) {
@@ -169,7 +148,7 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
     }
   });
 
-  app.get('/api/logs/:name', async (request, response, next) => {
+  app.get('/api/logs/:name', logLimiter, async (request, response, next) => {
     try {
       const lines = Number(request.query.lines ?? 200);
       const logName = getRouteParam(request.params.name);
@@ -184,7 +163,7 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
     }
   });
 
-  app.get(['/dashboard', '/dashboard/*path'], (_request, response, next) => {
+  app.get(['/dashboard', '/dashboard/*path'], dashboardLimiter, (_request, response, next) => {
     response.sendFile(dashboardIndexFile, (error) => {
       if (error) {
         next(error);
