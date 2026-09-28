@@ -31,6 +31,24 @@ corepack pnpm run typecheck
 corepack pnpm test
 ```
 
+### Dev container
+
+`pnpm run dev` builds a development container (via `docker-compose.dev.yml`) that installs
+dependencies, bind-mounts the repo, and runs the client bundler and server together with
+live reload:
+
+```bash
+pnpm run dev
+```
+
+This runs esbuild in watch mode for the client (`public/dist/`) and `tsx watch` for the
+server, both inside the container, and exposes the dashboard on `http://localhost:3000`.
+SQLite data persists in the `dev-data` Docker volume, and `./dms-root/` on the host is
+mounted to `/dms` — replace it with your Docker Mailserver config path, or leave it empty
+to see the dashboard's warning state. Environment values come from `example.env`; copy it
+to `.env` and adjust as needed, then add `--env-file .env` overrides or edit
+`docker-compose.dev.yml` to point at your own env file.
+
 ## Build
 
 ```bash

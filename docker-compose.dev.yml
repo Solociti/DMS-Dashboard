@@ -1,0 +1,21 @@
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      target: dev
+    env_file:
+      - example.env
+    environment:
+      - DATABASE_PATH=/data/tracker.sqlite
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - dev-data:/data
+      - ./dms-root:/dms
+    command: pnpm run dev:container
+
+volumes:
+  dev-data:
