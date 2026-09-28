@@ -1,4 +1,3 @@
-local lua_util = require "lua_util"
 local logger = require "rspamd_logger"
 
 local settings = {
@@ -23,25 +22,30 @@ local function inject_tracking_pixel(body, message_id)
   return replaced
 end
 
-rspamd_config:register_post_filter(function(task)
-  if not task:get_user() then
-    return
-  end
+rspamd_config:register_symbol({
+  name = "EMAIL_TRACKING_PIXEL",
+  type = "postfilter",
+  priority = 10,
+  callback = function(task)
+    if not task:get_user() then
+      return
+    end
 
-  local message_id = trim_angle_brackets(task:get_header("Message-ID"))
-  if not message_id then
-    logger.infox(task, "email_tracking: skipping message without Message-ID")
-    return
-  end
+    local message_id = trim_angle_brackets(task:get_header("Message-ID"))
+    if not message_id then
+      logger.infox(task, "email_tracking: skipping message without Message-ID")
+      return
+    end
 
-  local parts = task:get_text_parts() or {}
-  for _, part in ipairs(parts) do
-    if part:is_html() then
-      local content = part:get_content('raw_parsed') or part:get_content() or ''
-      local updated = inject_tracking_pixel(content, message_id)
-      if updated ~= content then
-        part:set_content(updated)
+    local parts = task:get_text_parts() or {}
+    for _, part in ipairs(parts) do
+      if part:is_html() then
+        local content = part:get_content() or ""
+        local updated = inject_tracking_pixel(content, message_id)
+        if updated ~= content then
+          part:set_content(updated)
+        end
       end
     end
   end
-end)
+})
