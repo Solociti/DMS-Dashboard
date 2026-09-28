@@ -24,3 +24,14 @@ export interface LogFileResponse {
   lines: number;
   content: string;
 }
+
+export interface DashboardWarning {
+  code: string;
+  title: string;
+  message: string;
+}
+
+export interface WarningState {
+  warnings: DashboardWarning[];
+  checkedAt: string | null;
+}

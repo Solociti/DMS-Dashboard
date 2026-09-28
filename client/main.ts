@@ -1,4 +1,11 @@
-import type { LogFileInfo, LogFileResponse, OpenLogEntry, OpenSummary } from '../common/types';
+import type {
+  DashboardWarning,
+  LogFileInfo,
+  LogFileResponse,
+  OpenLogEntry,
+  OpenSummary,
+  WarningState
+} from '../common/types';
 
 const trackedCount = document.querySelector<HTMLParagraphElement>('#tracked-count');
 const totalOpens = document.querySelector<HTMLParagraphElement>('#total-opens');
@@ -9,9 +16,13 @@ const detailsList = document.querySelector<HTMLUListElement>('#details-list');
 const logList = document.querySelector<HTMLUListElement>('#log-list');
 const logTitle = document.querySelector<HTMLElement>('#log-title');
 const logContent = document.querySelector<HTMLElement>('#log-content');
+const warningPanel = document.querySelector<HTMLElement>('#warning-panel');
+const warningList = document.querySelector<HTMLUListElement>('#warning-list');
+const warningStatus = document.querySelector<HTMLParagraphElement>('#warning-status');
 const refreshMetricsButton = document.querySelector<HTMLButtonElement>('#refresh-metrics');
 const refreshLogsButton = document.querySelector<HTMLButtonElement>('#refresh-logs');
 const tailLogButton = document.querySelector<HTMLButtonElement>('#tail-log');
+const refreshWarningsButton = document.querySelector<HTMLButtonElement>('#refresh-warnings');
 const overviewView = document.querySelector<HTMLElement>('#overview-view');
 const logsView = document.querySelector<HTMLElement>('#logs-view');
 const tabs = Array.from(document.querySelectorAll<HTMLAnchorElement>('.tabs a'));
@@ -49,6 +60,32 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unexpected error';
 }
 
+function renderWarnings(state: WarningState): void {
+  if (!warningPanel || !warningList || !warningStatus) {
+    return;
+  }
+
+  warningStatus.textContent = state.checkedAt
+    ? `Last checked ${formatDate(state.checkedAt)}.`
+    : 'Warnings have not been checked yet.';
+
+  if (state.warnings.length === 0) {
+    warningPanel.classList.add('hidden');
+    replaceChildren(warningList, createElement('li', 'No warnings.'));
+    return;
+  }
+
+  warningPanel.classList.remove('hidden');
+  replaceChildren(
+    warningList,
+    ...state.warnings.map((warning: DashboardWarning) => {
+      const item = createElement('li');
+      item.append(createElement('strong', warning.title), createElement('span', warning.message));
+      return item;
+    })
+  );
+}
+
 function runOverviewTask(task: () => Promise<void>): void {
   task().catch((error) => {
     if (messageTableBody) {
@@ -81,8 +118,20 @@ function runLogTask(task: () => Promise<void>): void {
   });
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+function runWarningTask(task: () => Promise<void>): void {
+  task().catch((error) => {
+    if (!warningPanel || !warningList || !warningStatus) {
+      return;
+    }
+
+    warningPanel.classList.remove('hidden');
+    warningStatus.textContent = 'Warning refresh failed.';
+    replaceChildren(warningList, createElement('li', getErrorMessage(error)));
+  });
+}
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
   if (!response.ok) {
     throw new Error(`Request failed (${response.status}) for ${url}`);
   }
@@ -104,6 +153,13 @@ function updateTabs(): void {
   } else {
     stopLogPolling();
   }
+}
+
+async function loadWarnings(recheck = false): Promise<void> {
+  const state = await fetchJson<WarningState>(recheck ? '/api/warnings/recheck' : '/api/warnings', {
+    method: recheck ? 'POST' : 'GET'
+  });
+  renderWarnings(state);
 }
 
 async function loadMetrics(): Promise<void> {
@@ -283,8 +339,11 @@ document.addEventListener('click', (event) => {
 refreshMetricsButton?.addEventListener('click', () => runOverviewTask(loadMetrics));
 refreshLogsButton?.addEventListener('click', () => runLogTask(loadLogs));
 tailLogButton?.addEventListener('click', () => runLogTask(loadLogContent));
+refreshWarningsButton?.addEventListener('click', () => runWarningTask(() => loadWarnings(true)));
 
 function initializeView(): void {
+  runWarningTask(() => loadWarnings(false));
+
   if (isLogsRoute()) {
     runLogTask(loadLogs);
     return;

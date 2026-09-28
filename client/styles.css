@@ -54,8 +54,8 @@ table { width: 100%; border-collapse: collapse; }
 th, td { padding: 0.9rem; border-bottom: 1px solid rgba(84, 125, 168, 0.2); text-align: left; }
 tbody tr { cursor: pointer; }
 tbody tr:hover, .log-list button:hover { background: rgba(134, 185, 243, 0.08); }
-.details-list, .log-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
-.details-list li, .log-list button {
+.details-list, .log-list, .warning-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
+.details-list li, .log-list button, .warning-list li {
   width: 100%;
   border: 1px solid rgba(84, 125, 168, 0.2);
   background: rgba(9, 19, 31, 0.55);
@@ -63,6 +63,20 @@ tbody tr:hover, .log-list button:hover { background: rgba(134, 185, 243, 0.08); 
   border-radius: 16px;
   padding: 0.85rem 1rem;
   text-align: left;
+}
+.warning-panel {
+  border-color: rgba(255, 179, 71, 0.4);
+  background: rgba(61, 38, 8, 0.45);
+  margin-bottom: 1.25rem;
+}
+.warning-list li {
+  border-color: rgba(255, 179, 71, 0.35);
+  background: rgba(64, 42, 10, 0.45);
+}
+.warning-list strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #ffd28f;
 }
 .log-list button.active { border-color: #86b9f3; }
 .log-output {

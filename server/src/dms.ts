@@ -24,8 +24,6 @@ export async function ensureTrackingFilter(dmsRoot: string, trackingLuaSourcePat
     if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
       throw error;
     }
-
-    // Missing file is expected during first-time setup.
   }
 
   await fs.copyFile(trackingLuaSourcePath, targetPath);

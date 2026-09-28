@@ -6,7 +6,7 @@ export interface AppConfig {
   databasePath: string;
   dmsRoot: string;
   trustProxy: boolean | number | string;
-  trackingBaseUrl: string;
+  trackingBaseUrl: string | null;
   trackingLuaSourcePath: string;
   publicRoot: string;
   publicDistRoot: string;
@@ -38,6 +38,15 @@ function parseTrustProxy(value: string | undefined): boolean | number | string {
   }
 
   return value;
+}
+
+function parseTrackingBaseUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.replace(/\/$/, '');
 }
 
 function parseLogFiles(raw: string | undefined, dmsRoot: string): Record<string, string> {
@@ -77,7 +86,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     databasePath: environment.DATABASE_PATH || '/data/tracker.sqlite',
     dmsRoot,
     trustProxy: parseTrustProxy(environment.TRUST_PROXY),
-    trackingBaseUrl: (environment.TRACKING_BASE_URL || 'https://example.invalid').replace(/\/$/, ''),
+    trackingBaseUrl: parseTrackingBaseUrl(environment.TRACKING_BASE_URL),
     trackingLuaSourcePath: path.join(appRoot, 'dms', 'email_tracking.lua'),
     publicRoot: path.join(appRoot, 'public'),
     publicDistRoot: path.join(appRoot, 'public', 'dist'),

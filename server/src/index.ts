@@ -4,19 +4,22 @@ import { loadConfig, type AppConfig } from './config';
 import { createDatabase, ensureDatabaseDirectory, runMigrations } from './db';
 import { ensureTrackingFilter } from './dms';
 import type { LogRegistry } from './logs';
+import { WarningStore } from './warnings';
 
-export { createApp, loadConfig, createDatabase, ensureDatabaseDirectory, runMigrations, ensureTrackingFilter };
+export { createApp, loadConfig, createDatabase, ensureDatabaseDirectory, runMigrations, ensureTrackingFilter, WarningStore };
 export type { AppConfig, LogRegistry };
 
 export async function createServerApplication(config: AppConfig = loadConfig()) {
-  await ensureTrackingFilter(config.dmsRoot, config.trackingLuaSourcePath);
   await ensureDatabaseDirectory(config.databasePath);
 
   const database = createDatabase(config.databasePath);
   await runMigrations(database);
 
-  const app = createApp(config, database, config.logFiles);
-  return { app, database };
+  const warningStore = new WarningStore(config);
+  await warningStore.refresh();
+
+  const app = createApp(config, database, config.logFiles, warningStore);
+  return { app, database, warningStore };
 }
 
 export async function startServer(config: AppConfig = loadConfig()): Promise<{ server: Server; database: Awaited<ReturnType<typeof createServerApplication>>['database'] }> {

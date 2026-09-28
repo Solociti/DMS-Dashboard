@@ -51,6 +51,99 @@ test('ensureTrackingFilter does not overwrite an existing filter file', async ()
   assert.equal(await fs.readFile(target, 'utf8'), '-- existing lua');
 });
 
+test('warning API reports missing tracking base URL and skips filter install', async () => {
+  const root = await makeTempDir();
+  const dmsRoot = path.join(root, 'dms');
+  const overrideDir = path.join(dmsRoot, 'rspamd', 'override.d');
+  const publicDir = path.join(root, 'public');
+  const publicDistDir = path.join(publicDir, 'dist');
+  const luaSource = path.join(root, 'email_tracking.lua');
+  const dbPath = path.join(root, 'data', 'tracker.sqlite');
+  const target = path.join(overrideDir, 'email_tracking.lua');
+
+  await fs.mkdir(overrideDir, { recursive: true });
+  await fs.mkdir(publicDistDir, { recursive: true });
+  await fs.writeFile(luaSource, '-- lua');
+  await fs.writeFile(path.join(publicDistDir, 'index.html'), '<!doctype html><title>ok</title>');
+
+  const { app, database } = await createServerApplication({
+    appRoot: root,
+    port: 0,
+    databasePath: dbPath,
+    dmsRoot,
+    trustProxy: false,
+    trackingBaseUrl: null,
+    trackingLuaSourcePath: luaSource,
+    publicRoot: publicDir,
+    publicDistRoot: publicDistDir,
+    logFiles: {}
+  });
+
+  const server = await new Promise((resolve) => {
+    const instance = app.listen(0, () => resolve(instance));
+  });
+
+  try {
+    const address = server.address();
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const warningState = await (await fetch(`${baseUrl}/api/warnings`)).json();
+    assert.equal(warningState.warnings.length, 1);
+    assert.equal(warningState.warnings[0].code, 'tracking-base-url-missing');
+    await assert.rejects(() => fs.access(target));
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    await database.destroy();
+  }
+});
+
+test('warning recheck clears override warning and installs the filter', async () => {
+  const root = await makeTempDir();
+  const dmsRoot = path.join(root, 'dms');
+  const publicDir = path.join(root, 'public');
+  const publicDistDir = path.join(publicDir, 'dist');
+  const luaSource = path.join(root, 'email_tracking.lua');
+  const dbPath = path.join(root, 'data', 'tracker.sqlite');
+  const overrideDir = path.join(dmsRoot, 'rspamd', 'override.d');
+  const target = path.join(overrideDir, 'email_tracking.lua');
+
+  await fs.mkdir(publicDistDir, { recursive: true });
+  await fs.writeFile(luaSource, '-- lua');
+  await fs.writeFile(path.join(publicDistDir, 'index.html'), '<!doctype html><title>ok</title>');
+
+  const { app, database } = await createServerApplication({
+    appRoot: root,
+    port: 0,
+    databasePath: dbPath,
+    dmsRoot,
+    trustProxy: false,
+    trackingBaseUrl: 'https://tracker.example.com',
+    trackingLuaSourcePath: luaSource,
+    publicRoot: publicDir,
+    publicDistRoot: publicDistDir,
+    logFiles: {}
+  });
+
+  const server = await new Promise((resolve) => {
+    const instance = app.listen(0, () => resolve(instance));
+  });
+
+  try {
+    const address = server.address();
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const warningState = await (await fetch(`${baseUrl}/api/warnings`)).json();
+    assert.equal(warningState.warnings.length, 1);
+    assert.equal(warningState.warnings[0].code, 'rspamd-override-missing');
+
+    await fs.mkdir(overrideDir, { recursive: true });
+    const refreshedState = await (await fetch(`${baseUrl}/api/warnings/recheck`, { method: 'POST' })).json();
+    assert.equal(refreshedState.warnings.length, 0);
+    assert.equal(await fs.readFile(target, 'utf8'), '-- lua');
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    await database.destroy();
+  }
+});
+
 test('tracking pixel endpoint records opens and returns a gif', async () => {
   const root = await makeTempDir();
   const dmsRoot = path.join(root, 'dms');

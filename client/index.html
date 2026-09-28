@@ -23,6 +23,19 @@
         <a href="/dashboard/logs" data-tab="logs">Logs</a>
       </nav>
 
+      <section id="warning-panel" class="panel warning-panel hidden">
+        <div class="panel-heading">
+          <div>
+            <h2>Configuration warnings</h2>
+            <p id="warning-status" class="muted">Warnings are checked on startup and when you re-run the check below.</p>
+          </div>
+          <button id="refresh-warnings" type="button">Recheck warnings</button>
+        </div>
+        <ul id="warning-list" class="warning-list">
+          <li>No warnings.</li>
+        </ul>
+      </section>
+
       <main class="layout">
         <section id="overview-view" class="panel stack">
           <div class="stats-grid">

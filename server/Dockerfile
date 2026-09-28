@@ -1,8 +1,8 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
 
 COPY client ./client
 COPY common ./common
@@ -12,7 +12,7 @@ COPY scripts ./scripts
 COPY server ./server
 COPY tsconfig.json ./tsconfig.json
 
-RUN npm run build
+RUN pnpm run build
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production

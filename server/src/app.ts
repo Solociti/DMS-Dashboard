@@ -6,6 +6,7 @@ import type { Knex } from 'knex';
 import type { OpenLogEntry, OpenSummary } from '../../common/types';
 import type { AppConfig } from './config';
 import { listLogFiles, readLogFile, type LogRegistry } from './logs';
+import { WarningStore } from './warnings';
 
 const TRANSPARENT_GIF = Buffer.from('R0lGODlhAQABAPAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64');
 const dashboardIndexPath = 'index.html';
@@ -76,12 +77,13 @@ async function getOpenEvents(database: Knex, msgId: string): Promise<OpenLogEntr
   }));
 }
 
-export function createApp(config: AppConfig, database: Knex, logRegistry: LogRegistry): express.Express {
+export function createApp(config: AppConfig, database: Knex, logRegistry: LogRegistry, warningStore: WarningStore): express.Express {
   const app = express();
   const openPixelLimiter = createRateLimiter(120, 60_000);
   const opensApiLimiter = createRateLimiter(240, 60_000);
   const dashboardLimiter = createRateLimiter(240, 60_000);
   const logLimiter = createRateLimiter(120, 60_000);
+  const warningLimiter = createRateLimiter(60, 60_000);
   const dashboardIndexFile = path.join(config.publicDistRoot, dashboardIndexPath);
 
   app.disable('x-powered-by');
@@ -158,6 +160,18 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
       }
 
       response.json(await readLogFile(logRegistry, logName, lines));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/warnings', warningLimiter, (_request, response) => {
+    response.json(warningStore.getState());
+  });
+
+  app.post('/api/warnings/recheck', warningLimiter, async (_request, response, next) => {
+    try {
+      response.json(await warningStore.refresh());
     } catch (error) {
       next(error);
     }

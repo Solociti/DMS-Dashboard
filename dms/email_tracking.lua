@@ -2,10 +2,6 @@ local lua_mime = require "lua_mime"
 local rspamd_logger = require "rspamd_logger"
 local rspamd_trie = require "rspamd_trie"
 
-local settings = {
-  tracking_base_url = (os.getenv("TRACKING_BASE_URL") or "https://example.invalid"):gsub("/$", "")
-}
-
 local body_close_pattern = rspamd_trie.create({ "</body>" }, rspamd_trie.flags.icase)
 
 local function url_encode(value)
@@ -15,9 +11,14 @@ local function url_encode(value)
 end
 
 local function build_pixel(message_id)
+  local tracking_base_url = (os.getenv("TRACKING_BASE_URL") or ""):gsub("/$", "")
+  if tracking_base_url == "" then
+    return nil
+  end
+
   return string.format(
     '<img src="%s/open/%s.png" alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0;overflow:hidden;" />',
-    settings.tracking_base_url,
+    tracking_base_url,
     url_encode(message_id)
   )
 end
@@ -43,8 +44,14 @@ rspamd_config:register_symbol({
       return
     end
 
+    local pixel = build_pixel(message_id)
+    if not pixel then
+      rspamd_logger.infox(task, "email_tracking: skipping message because TRACKING_BASE_URL is unset")
+      return
+    end
+
     local rewrite = lua_mime.multipattern_text_replace(task, body_close_pattern, {
-      build_pixel(message_id) .. "</body>"
+      pixel .. "</body>"
     })
 
     if not rewrite or not rewrite.out then
