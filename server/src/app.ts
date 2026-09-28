@@ -98,21 +98,26 @@ async function getOpenEvents(database: Knex, msgId: string): Promise<OpenLogEntr
 export function createApp(config: AppConfig, database: Knex, logRegistry: LogRegistry): express.Express {
   const app = express();
   const openPixelLimiter = createRateLimiter(120, 60_000);
+  const opensApiLimiter = createRateLimiter(240, 60_000);
   const dashboardLimiter = createRateLimiter(240, 60_000);
   const logLimiter = createRateLimiter(120, 60_000);
   const dashboardIndexFile = path.join(config.publicDistRoot, dashboardIndexPath);
 
   app.disable('x-powered-by');
-  app.set('trust proxy', true);
+  app.set('trust proxy', config.trustProxy);
   app.use(express.json());
   app.use(express.static(config.publicRoot));
+  app.use('/open', openPixelLimiter);
+  app.use('/api/opens', opensApiLimiter);
+  app.use('/api/logs', logLimiter);
+  app.use('/dashboard', dashboardLimiter);
   app.use('/dashboard', express.static(config.publicDistRoot, { index: false }));
 
   app.get('/', (_request: Request, response: Response) => {
     response.redirect('/dashboard');
   });
 
-  app.get('/open/:msgId.png', openPixelLimiter, async (request: Request, response: Response, next) => {
+  app.get('/open/:msgId.png', async (request: Request, response: Response, next) => {
     try {
       const msgId = getRouteParam(request.params.msgId);
       if (!msgId) {
@@ -156,7 +161,7 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
     }
   });
 
-  app.get('/api/logs', logLimiter, async (_request, response, next) => {
+  app.get('/api/logs', async (_request, response, next) => {
     try {
       response.json(await listLogFiles(logRegistry));
     } catch (error) {
@@ -164,7 +169,7 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
     }
   });
 
-  app.get('/api/logs/:name', logLimiter, async (request, response, next) => {
+  app.get('/api/logs/:name', async (request, response, next) => {
     try {
       const lines = Number(request.query.lines ?? 200);
       const logName = getRouteParam(request.params.name);
@@ -179,7 +184,7 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
     }
   });
 
-  app.get(['/dashboard', '/dashboard/*path'], dashboardLimiter, (_request, response, next) => {
+  app.get(['/dashboard', '/dashboard/*path'], (_request, response, next) => {
     response.sendFile(dashboardIndexFile, (error) => {
       if (error) {
         next(error);

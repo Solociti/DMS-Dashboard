@@ -19,14 +19,14 @@ export async function createServerApplication(config: AppConfig = loadConfig()) 
   return { app, database };
 }
 
-export async function startServer(config: AppConfig = loadConfig()): Promise<Server> {
-  const { app } = await createServerApplication(config);
+export async function startServer(config: AppConfig = loadConfig()): Promise<{ server: Server; database: Awaited<ReturnType<typeof createServerApplication>>['database'] }> {
+  const { app, database } = await createServerApplication(config);
 
   return new Promise((resolve, reject) => {
     const server = app.listen(config.port, () => {
       server.off('error', reject);
       console.log(`DMS Dashboard listening on ${config.port}`);
-      resolve(server);
+      resolve({ server, database });
     });
 
     server.once('error', reject);

@@ -45,6 +45,42 @@ function createElement<K extends keyof HTMLElementTagNameMap>(tagName: K, textCo
   return element;
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unexpected error';
+}
+
+function runOverviewTask(task: () => Promise<void>): void {
+  task().catch((error) => {
+    if (messageTableBody) {
+      const row = createElement('tr');
+      const cell = createElement('td', getErrorMessage(error));
+      cell.colSpan = 3;
+      row.append(cell);
+      replaceChildren(messageTableBody, row);
+    }
+
+    if (detailsTitle) {
+      detailsTitle.textContent = 'Overview failed to load';
+    }
+
+    if (detailsList) {
+      replaceChildren(detailsList, createElement('li', getErrorMessage(error)));
+    }
+  });
+}
+
+function runLogTask(task: () => Promise<void>): void {
+  task().catch((error) => {
+    if (logTitle) {
+      logTitle.textContent = 'Log output';
+    }
+
+    if (logContent) {
+      logContent.textContent = getErrorMessage(error);
+    }
+  });
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
@@ -91,7 +127,7 @@ async function loadMetrics(): Promise<void> {
     return;
   }
 
-  if (!selectedMessageId) {
+  if (!selectedMessageId || !rows.some((row) => row.msgId === selectedMessageId)) {
     selectedMessageId = rows[0].msgId;
   }
 
@@ -212,7 +248,7 @@ function startLogPolling(): void {
   }
 
   logPoller = window.setInterval(() => {
-    void loadLogs();
+    runLogTask(loadLogs);
   }, 10000);
 }
 
@@ -225,7 +261,7 @@ function stopLogPolling(): void {
 
 window.addEventListener('popstate', () => {
   updateTabs();
-  void initializeView();
+  initializeView();
 });
 
 document.addEventListener('click', (event) => {
@@ -241,21 +277,21 @@ document.addEventListener('click', (event) => {
   event.preventDefault();
   window.history.pushState({}, '', target.href);
   updateTabs();
-  void initializeView();
+  initializeView();
 });
 
-refreshMetricsButton?.addEventListener('click', () => void loadMetrics());
-refreshLogsButton?.addEventListener('click', () => void loadLogs());
-tailLogButton?.addEventListener('click', () => void loadLogContent());
+refreshMetricsButton?.addEventListener('click', () => runOverviewTask(loadMetrics));
+refreshLogsButton?.addEventListener('click', () => runLogTask(loadLogs));
+tailLogButton?.addEventListener('click', () => runLogTask(loadLogContent));
 
-async function initializeView(): Promise<void> {
+function initializeView(): void {
   if (isLogsRoute()) {
-    await loadLogs();
+    runLogTask(loadLogs);
     return;
   }
 
-  await loadMetrics();
+  runOverviewTask(loadMetrics);
 }
 
 updateTabs();
-void initializeView();
+initializeView();

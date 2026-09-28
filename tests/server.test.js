@@ -43,6 +43,7 @@ test('tracking pixel endpoint records opens and returns a gif', async () => {
     port: 0,
     databasePath: dbPath,
     dmsRoot,
+    trustProxy: true,
     trackingBaseUrl: 'https://tracker.example.com',
     trackingLuaSourcePath: luaSource,
     publicRoot: publicDir,
@@ -85,6 +86,10 @@ test('tracking pixel endpoint records opens and returns a gif', async () => {
 
     const logContent = await (await fetch(`${baseUrl}/api/logs/rspamd?lines=2`)).json();
     assert.equal(logContent.content, 'second\nthird');
+
+    const missingLogResponse = await fetch(`${baseUrl}/api/logs/unknown`);
+    assert.equal(missingLogResponse.status, 404);
+    assert.equal((await missingLogResponse.json()).error, 'Unknown log file: unknown');
   } finally {
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     await database.destroy();
