@@ -1,0 +1,35 @@
+{
+  "name": "dms-dashboard",
+  "version": "1.0.0",
+  "description": "Docker Mailserver email tracking dashboard",
+  "main": "build/server/index.js",
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "start": "node ./build/server/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node ./scripts/build.mjs && node --test tests/**/*.test.js"
+  },
+  "keywords": [
+    "dms",
+    "rspamd",
+    "email-tracking",
+    "express",
+    "knex",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.7.0",
+    "knex": "^3.1.0",
+    "sqlite3": "6.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.5.2",
+    "@vercel/ncc": "^0.38.4",
+    "esbuild": "0.28.1",
+    "typescript": "5.9.2"
+  }
+}

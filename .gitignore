@@ -1,0 +1,10 @@
+node_modules
+.pnpm-store
+build
+public/dist
+coverage
+.env
+/data/
+.DS_Store
+npm-debug.log*
+pnpm-debug.log*
