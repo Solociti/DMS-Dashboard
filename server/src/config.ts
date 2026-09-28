@@ -30,7 +30,13 @@ function parseLogFiles(raw: string | undefined, dmsRoot: string): Record<string,
     .map((entry) => entry.trim())
     .filter(Boolean)
     .reduce<Record<string, string>>((accumulator, entry) => {
-      const [name, filePath] = entry.split(':', 2).map((segment) => segment.trim());
+      const separatorIndex = entry.indexOf(':');
+      if (separatorIndex <= 0) {
+        return accumulator;
+      }
+
+      const name = entry.slice(0, separatorIndex).trim();
+      const filePath = entry.slice(separatorIndex + 1).trim();
       if (name && filePath) {
         accumulator[name] = filePath;
       }

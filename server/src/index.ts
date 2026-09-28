@@ -22,11 +22,14 @@ export async function createServerApplication(config: AppConfig = loadConfig()) 
 export async function startServer(config: AppConfig = loadConfig()): Promise<Server> {
   const { app } = await createServerApplication(config);
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = app.listen(config.port, () => {
+      server.off('error', reject);
       console.log(`DMS Dashboard listening on ${config.port}`);
       resolve(server);
     });
+
+    server.once('error', reject);
   });
 }
 

@@ -14,7 +14,6 @@ export interface OpenLogEntry {
 
 export interface LogFileInfo {
   name: string;
-  path: string;
   exists: boolean;
   sizeBytes: number | null;
   updatedAt: string | null;

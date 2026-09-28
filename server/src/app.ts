@@ -1,5 +1,4 @@
 import express, { type Request, type Response } from 'express';
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Knex } from 'knex';
 
@@ -8,6 +7,12 @@ import type { AppConfig } from './config';
 import { listLogFiles, readLogFile, type LogRegistry } from './logs';
 
 const TRANSPARENT_GIF = Buffer.from('R0lGODlhAQABAPAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64');
+const dashboardIndexPath = 'index.html';
+
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
 
 interface RawOpenRow {
   id: number;
@@ -23,13 +28,45 @@ interface RawSummaryRow {
   last_opened: string | null;
 }
 
-export function getClientIp(request: Request): string | null {
-  const forwardedFor = request.header('x-forwarded-for');
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0]?.trim() || null;
+function getRouteParam(value: string | string[] | undefined): string | null {
+  if (typeof value === 'string') {
+    return value;
   }
 
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return null;
+}
+
+export function getClientIp(request: Request): string | null {
   return request.ip || request.socket.remoteAddress || null;
+}
+
+function createRateLimiter(limit: number, windowMs: number): express.RequestHandler {
+  const entries = new Map<string, RateLimitEntry>();
+
+  return (request, response, next) => {
+    const now = Date.now();
+    const key = request.ip || request.socket.remoteAddress || 'unknown';
+    const current = entries.get(key);
+
+    if (!current || current.resetAt <= now) {
+      entries.set(key, { count: 1, resetAt: now + windowMs });
+      next();
+      return;
+    }
+
+    if (current.count >= limit) {
+      response.setHeader('Retry-After', String(Math.ceil((current.resetAt - now) / 1000)));
+      response.status(429).json({ error: 'Rate limit exceeded' });
+      return;
+    }
+
+    current.count += 1;
+    next();
+  };
 }
 
 async function getOpenSummaries(database: Knex): Promise<OpenSummary[]> {
@@ -60,6 +97,10 @@ async function getOpenEvents(database: Knex, msgId: string): Promise<OpenLogEntr
 
 export function createApp(config: AppConfig, database: Knex, logRegistry: LogRegistry): express.Express {
   const app = express();
+  const openPixelLimiter = createRateLimiter(120, 60_000);
+  const dashboardLimiter = createRateLimiter(240, 60_000);
+  const logLimiter = createRateLimiter(120, 60_000);
+  const dashboardIndexFile = path.join(config.publicDistRoot, dashboardIndexPath);
 
   app.disable('x-powered-by');
   app.set('trust proxy', true);
@@ -71,10 +112,16 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
     response.redirect('/dashboard');
   });
 
-  app.get('/open/:msgId.png', async (request: Request, response: Response, next) => {
+  app.get('/open/:msgId.png', openPixelLimiter, async (request: Request, response: Response, next) => {
     try {
+      const msgId = getRouteParam(request.params.msgId);
+      if (!msgId) {
+        response.status(400).json({ error: 'Missing message id' });
+        return;
+      }
+
       await database('opens').insert({
-        msg_id: request.params.msgId,
+        msg_id: msgId,
         ip_address: getClientIp(request),
         user_agent: request.header('user-agent') || null
       });
@@ -97,13 +144,19 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
 
   app.get('/api/opens/:msgId', async (request, response, next) => {
     try {
-      response.json(await getOpenEvents(database, request.params.msgId));
+      const msgId = getRouteParam(request.params.msgId);
+      if (!msgId) {
+        response.status(400).json({ error: 'Missing message id' });
+        return;
+      }
+
+      response.json(await getOpenEvents(database, msgId));
     } catch (error) {
       next(error);
     }
   });
 
-  app.get('/api/logs', async (_request, response, next) => {
+  app.get('/api/logs', logLimiter, async (_request, response, next) => {
     try {
       response.json(await listLogFiles(logRegistry));
     } catch (error) {
@@ -111,22 +164,27 @@ export function createApp(config: AppConfig, database: Knex, logRegistry: LogReg
     }
   });
 
-  app.get('/api/logs/:name', async (request, response, next) => {
+  app.get('/api/logs/:name', logLimiter, async (request, response, next) => {
     try {
       const lines = Number(request.query.lines ?? 200);
-      response.json(await readLogFile(logRegistry, request.params.name, lines));
+      const logName = getRouteParam(request.params.name);
+      if (!logName) {
+        response.status(400).json({ error: 'Missing log name' });
+        return;
+      }
+
+      response.json(await readLogFile(logRegistry, logName, lines));
     } catch (error) {
       next(error);
     }
   });
 
-  app.get(['/dashboard', '/dashboard/*path'], async (_request, response, next) => {
-    try {
-      const html = await fs.readFile(path.join(config.publicDistRoot, 'index.html'), 'utf8');
-      response.type('html').send(html);
-    } catch (error) {
-      next(error);
-    }
+  app.get(['/dashboard', '/dashboard/*path'], dashboardLimiter, (_request, response, next) => {
+    response.sendFile(dashboardIndexFile, (error) => {
+      if (error) {
+        next(error);
+      }
+    });
   });
 
   app.use((error: unknown, _request: Request, response: Response, _next: express.NextFunction) => {

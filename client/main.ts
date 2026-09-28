@@ -32,6 +32,19 @@ function formatDate(value: string | null): string {
   return new Date(value).toLocaleString();
 }
 
+function replaceChildren(element: Element, ...children: Node[]): void {
+  element.replaceChildren(...children);
+}
+
+function createElement<K extends keyof HTMLElementTagNameMap>(tagName: K, textContent?: string): HTMLElementTagNameMap[K] {
+  const element = document.createElement(tagName);
+  if (textContent !== undefined) {
+    element.textContent = textContent;
+  }
+
+  return element;
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   if (!response.ok) {
@@ -68,9 +81,13 @@ async function loadMetrics(): Promise<void> {
   lastOpened.textContent = formatDate(rows[0]?.lastOpened ?? null);
 
   if (rows.length === 0) {
-    messageTableBody.innerHTML = '<tr><td colspan="3">No tracking data yet.</td></tr>';
+    const emptyRow = createElement('tr');
+    const emptyCell = createElement('td', 'No tracking data yet.');
+    emptyCell.colSpan = 3;
+    emptyRow.append(emptyCell);
+    replaceChildren(messageTableBody, emptyRow);
     detailsTitle && (detailsTitle.textContent = 'Select a message to inspect open events.');
-    detailsList && (detailsList.innerHTML = '<li>No message selected.</li>');
+    detailsList && replaceChildren(detailsList, createElement('li', 'No message selected.'));
     return;
   }
 
@@ -78,24 +95,23 @@ async function loadMetrics(): Promise<void> {
     selectedMessageId = rows[0].msgId;
   }
 
-  messageTableBody.innerHTML = rows
-    .map(
-      (row) => `
-        <tr data-msg-id="${row.msgId}">
-          <td>${row.msgId}</td>
-          <td>${row.totalOpens}</td>
-          <td>${formatDate(row.lastOpened)}</td>
-        </tr>
-      `
-    )
-    .join('');
-
-  messageTableBody.querySelectorAll<HTMLTableRowElement>('tr[data-msg-id]').forEach((row) => {
-    row.addEventListener('click', () => {
-      selectedMessageId = row.dataset.msgId ?? null;
-      void loadMessageDetails();
-    });
-  });
+  replaceChildren(
+    messageTableBody,
+    ...rows.map((row) => {
+      const tableRow = createElement('tr');
+      tableRow.dataset.msgId = row.msgId;
+      tableRow.append(
+        createElement('td', row.msgId),
+        createElement('td', String(row.totalOpens)),
+        createElement('td', formatDate(row.lastOpened))
+      );
+      tableRow.addEventListener('click', () => {
+        selectedMessageId = row.msgId;
+        void loadMessageDetails();
+      });
+      return tableRow;
+    })
+  );
 
   await loadMessageDetails();
 }
@@ -108,19 +124,22 @@ async function loadMessageDetails(): Promise<void> {
   const entries = await fetchJson<OpenLogEntry[]>(`/api/opens/${encodeURIComponent(selectedMessageId)}`);
   detailsTitle.textContent = `${selectedMessageId} • ${entries.length} open${entries.length === 1 ? '' : 's'}`;
 
-  detailsList.innerHTML = entries.length
-    ? entries
-        .map(
-          (entry) => `
-            <li>
-              <strong>${formatDate(entry.createdAt)}</strong><br />
-              <span>IP: ${entry.ipAddress ?? 'Unknown'}</span><br />
-              <span>User-Agent: ${entry.userAgent ?? 'Unknown'}</span>
-            </li>
-          `
-        )
-        .join('')
-    : '<li>No open events recorded for this message.</li>';
+  if (entries.length === 0) {
+    replaceChildren(detailsList, createElement('li', 'No open events recorded for this message.'));
+    return;
+  }
+
+  replaceChildren(
+    detailsList,
+    ...entries.map((entry) => {
+      const item = createElement('li');
+      const timestamp = createElement('strong', formatDate(entry.createdAt));
+      const ip = createElement('span', `IP: ${entry.ipAddress ?? 'Unknown'}`);
+      const agent = createElement('span', `User-Agent: ${entry.userAgent ?? 'Unknown'}`);
+      item.append(timestamp, document.createElement('br'), ip, document.createElement('br'), agent);
+      return item;
+    })
+  );
 }
 
 async function loadLogs(): Promise<void> {
@@ -130,7 +149,7 @@ async function loadLogs(): Promise<void> {
 
   const logs = await fetchJson<LogFileInfo[]>('/api/logs');
   if (logs.length === 0) {
-    logList.innerHTML = '<li>No configured log files were found.</li>';
+    replaceChildren(logList, createElement('li', 'No configured log files were found.'));
     selectedLogName = null;
     if (logTitle) {
       logTitle.textContent = 'Log output';
@@ -145,26 +164,34 @@ async function loadLogs(): Promise<void> {
     selectedLogName = logs[0].name;
   }
 
-  logList.innerHTML = logs
-    .map(
-      (log) => `
-        <li>
-          <button type="button" data-log-name="${log.name}" class="${log.name === selectedLogName ? 'active' : ''}">
-            <strong>${log.name}</strong><br />
-            <span>${log.exists ? `${log.path} • ${log.sizeBytes ?? 0} bytes` : `Missing: ${log.path}`}</span>
-          </button>
-        </li>
-      `
-    )
-    .join('');
+  replaceChildren(
+    logList,
+    ...logs.map((log) => {
+      const item = createElement('li');
+      const button = createElement('button');
+      button.type = 'button';
+      button.dataset.logName = log.name;
+      button.classList.toggle('active', log.name === selectedLogName);
 
-  logList.querySelectorAll<HTMLButtonElement>('button[data-log-name]').forEach((button) => {
-    button.addEventListener('click', () => {
-      selectedLogName = button.dataset.logName ?? null;
-      void loadLogContent();
-      void loadLogs();
-    });
-  });
+      const title = createElement('strong', log.name);
+      const details = createElement(
+        'span',
+        log.exists
+          ? `${log.sizeBytes ?? 0} bytes${log.updatedAt ? ` • Updated ${formatDate(log.updatedAt)}` : ''}`
+          : 'Missing log file'
+      );
+
+      button.append(title, document.createElement('br'), details);
+      button.addEventListener('click', () => {
+        selectedLogName = log.name;
+        void loadLogContent();
+        void loadLogs();
+      });
+
+      item.append(button);
+      return item;
+    })
+  );
 
   await loadLogContent();
 }

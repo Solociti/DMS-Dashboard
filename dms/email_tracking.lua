@@ -1,51 +1,119 @@
-local logger = require "rspamd_logger"
+local lua_mime = require "lua_mime"
+local rspamd_logger = require "rspamd_logger"
+local rspamd_trie = require "rspamd_trie"
 
 local settings = {
-  tracking_base_url = os.getenv("TRACKING_BASE_URL") or "https://example.invalid"
+  tracking_base_url = (os.getenv("TRACKING_BASE_URL") or "https://example.invalid"):gsub("/$", "")
 }
 
-local function trim_angle_brackets(value)
-  if not value then
-    return nil
-  end
+local body_close_pattern = rspamd_trie.create({ "</body>" }, rspamd_trie.flags.icase)
 
-  return (value:gsub("^<", ""):gsub(">$", ""))
+local function url_encode(value)
+  return (value:gsub("[^%w%-_%.~]", function(character)
+    return string.format("%%%02X", string.byte(character))
+  end))
 end
 
-local function inject_tracking_pixel(body, message_id)
-  local pixel = string.format('<img src="%s/open/%s.png" alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0;overflow:hidden;" />', settings.tracking_base_url, message_id)
-  local replaced, count = body:gsub("</body>", pixel .. "</body>", 1)
-  if count == 0 then
-    return body .. pixel
-  end
+local function build_pixel(message_id)
+  return string.format(
+    '<img src="%s/open/%s.png" alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0;overflow:hidden;" />',
+    settings.tracking_base_url,
+    url_encode(message_id)
+  )
+end
 
-  return replaced
+local function append_newline(buffer, newline)
+  buffer[#buffer + 1] = newline
 end
 
 rspamd_config:register_symbol({
   name = "EMAIL_TRACKING_PIXEL",
   type = "postfilter",
-  priority = 10,
+  priority = 5,
+  flags = "empty,nostat",
+  score = 0.0,
   callback = function(task)
     if not task:get_user() then
       return
     end
 
-    local message_id = trim_angle_brackets(task:get_header("Message-ID"))
+    local message_id = task:get_message_id()
     if not message_id then
-      logger.infox(task, "email_tracking: skipping message without Message-ID")
+      rspamd_logger.infox(task, "email_tracking: skipping message without Message-ID")
       return
     end
 
-    local parts = task:get_text_parts() or {}
-    for _, part in ipairs(parts) do
-      if part:is_html() then
-        local content = part:get_content() or ""
-        local updated = inject_tracking_pixel(content, message_id)
-        if updated ~= content then
-          part:set_content(updated)
-        end
+    local rewrite = lua_mime.multipattern_text_replace(task, body_close_pattern, {
+      build_pixel(message_id) .. "</body>"
+    })
+
+    if not rewrite or not rewrite.out then
+      return
+    end
+
+    local newline = "\r\n"
+    if task:get_newlines_type() == "lf" then
+      newline = "\n"
+    end
+
+    local headers = {}
+    local seen_content_transfer_encoding = false
+
+    task:headers_foreach(function(name, header)
+      local lower_name = name:lower()
+
+      if rewrite.need_rewrite_ct and lower_name == "content-type" then
+        headers[#headers + 1] = string.format(
+          "Content-Type: %s/%s; charset=utf-8",
+          rewrite.new_ct.type,
+          rewrite.new_ct.subtype
+        )
+        return
       end
+
+      if rewrite.need_rewrite_ct and lower_name == "content-transfer-encoding" then
+        headers[#headers + 1] = string.format(
+          "Content-Transfer-Encoding: %s",
+          rewrite.new_cte or "quoted-printable"
+        )
+        seen_content_transfer_encoding = true
+        return
+      end
+
+      headers[#headers + 1] = header.raw:gsub("\r?\n?$", "")
+    end, { full = true })
+
+    if rewrite.need_rewrite_ct and not seen_content_transfer_encoding then
+      headers[#headers + 1] = string.format(
+        "Content-Transfer-Encoding: %s",
+        rewrite.new_cte or "quoted-printable"
+      )
+    end
+
+    local output = {}
+
+    for _, header in ipairs(headers) do
+      output[#output + 1] = header
+      append_newline(output, newline)
+    end
+
+    append_newline(output, newline)
+
+    for _, part in ipairs(rewrite.out) do
+      if type(part) == "table" then
+        output[#output + 1] = part[1]
+        if part[2] then
+          append_newline(output, newline)
+        end
+      else
+        output[#output + 1] = part
+        append_newline(output, newline)
+      end
+    end
+
+    local ok = task:set_message(output)
+    if not ok then
+      rspamd_logger.errx(task, "email_tracking: failed to rewrite message %s", message_id)
     end
   end
 })

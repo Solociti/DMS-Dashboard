@@ -13,7 +13,6 @@ export async function listLogFiles(registry: LogRegistry): Promise<LogFileInfo[]
         const stats = await fs.stat(filePath);
         return {
           name,
-          path: filePath,
           exists: true,
           sizeBytes: stats.size,
           updatedAt: stats.mtime.toISOString()
@@ -21,7 +20,6 @@ export async function listLogFiles(registry: LogRegistry): Promise<LogFileInfo[]
       } catch {
         return {
           name,
-          path: filePath,
           exists: false,
           sizeBytes: null,
           updatedAt: null
