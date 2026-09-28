@@ -19,6 +19,7 @@ Copy `example.env` and adjust values as needed:
 - `PORT`: HTTP port for the dashboard server
 - `DATABASE_PATH`: persistent SQLite database path (default `/data/tracker.sqlite`)
 - `DMS_ROOT`: mounted Docker Mailserver path (default `/dms`)
+- `RSPAMD_OVERRIDE_DIR`: Rspamd `override.d` directory (default `${DMS_ROOT}/rspamd/override.d`)
 - `TRUST_PROXY`: set to `true`, a hop count, or a proxy definition only when the app sits behind your own trusted proxy
 - `TRACKING_BASE_URL`: externally reachable dashboard origin used by the Lua filter; when unset, the filter is not installed and the dashboard shows a warning
 - `LOG_FILES`: comma-separated log aliases and paths, for example `rspamd:/dms/logs/rspamd.log,mail:/dms/logs/mail.log`
@@ -73,4 +74,4 @@ At runtime, mount:
 - Docker Mailserver config at `/dms`
 - Persistent data at `/data`
 
-If `/dms/rspamd/override.d/` is available and `TRACKING_BASE_URL` is set, the bundled filter is copied into place when `email_tracking.lua` is missing. If those requirements are not met, the dashboard shows a warning and lets you re-run the check after you fix the environment.
+If the configured `RSPAMD_OVERRIDE_DIR` is available and `TRACKING_BASE_URL` is set, the bundled filter is copied into place when `email_tracking.lua` is missing. By default, this is `/dms/rspamd/override.d/`. If those requirements are not met, the dashboard shows a warning and lets you re-run the check after you fix the environment.
