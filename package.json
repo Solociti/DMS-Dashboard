@@ -2,7 +2,6 @@
   "name": "dms-dashboard",
   "version": "1.0.0",
   "description": "Docker Mailserver email tracking dashboard",
-  "packageManager": "pnpm@12.6.0",
   "main": "build/server/index.js",
   "scripts": {
     "build": "node ./scripts/build.mjs",

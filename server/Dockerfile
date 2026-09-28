@@ -2,8 +2,6 @@ FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
-
 COPY client ./client
 COPY common ./common
 COPY dms ./dms
@@ -12,6 +10,7 @@ COPY scripts ./scripts
 COPY server ./server
 COPY tsconfig.json ./tsconfig.json
 
+RUN corepack enable && pnpm install --frozen-lockfile
 RUN pnpm run build
 
 FROM node:22-bookworm-slim AS runtime
