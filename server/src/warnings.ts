@@ -49,7 +49,11 @@ async function collectTrackingWarnings(config: AppConfig): Promise<DashboardWarn
 
   if (
     !config.trackingBaseUrl ||
-    warnings.some((warning) => warning.code === 'rspamd-override-missing' || warning.code === 'rspamd-override-unavailable')
+    warnings.some((warning) =>
+      warning.code === 'rspamd-override-missing' ||
+      warning.code === 'rspamd-override-unavailable' ||
+      warning.code === 'rspamd-override-invalid'
+    )
   ) {
     return warnings;
   }
