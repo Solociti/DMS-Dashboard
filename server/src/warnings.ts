@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
 
 import type { DashboardWarning, WarningState } from '../../common/types';
 import type { AppConfig } from './config';
@@ -11,7 +10,7 @@ function createWarning(code: string, title: string, message: string): DashboardW
 
 async function collectTrackingWarnings(config: AppConfig): Promise<DashboardWarning[]> {
   const warnings: DashboardWarning[] = [];
-  const overrideDirectory = path.join(config.dmsRoot, 'rspamd', 'override.d');
+  const overrideDirectory = config.rspamdOverrideDir;
 
   if (!config.trackingBaseUrl) {
     warnings.push(
@@ -59,7 +58,7 @@ async function collectTrackingWarnings(config: AppConfig): Promise<DashboardWarn
   }
 
   try {
-    await ensureTrackingFilter(config.dmsRoot, config.trackingLuaSourcePath);
+    await ensureTrackingFilter(config.rspamdOverrideDir, config.trackingLuaSourcePath);
   } catch (error) {
     warnings.push(
       createWarning(

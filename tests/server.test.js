@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { createServerApplication, ensureTrackingFilter } = require('../build/server/index.js');
+const { createServerApplication, ensureTrackingFilter, loadConfig } = require('../build/server/index.js');
 
 async function makeTempDir() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'dms-dashboard-'));
@@ -25,13 +25,21 @@ async function waitFor(check, timeoutMs = 2000) {
   throw new Error('Timed out waiting for condition');
 }
 
+test('loadConfig accepts a custom Rspamd override directory', () => {
+  const config = loadConfig({ DMS_ROOT: '/mail', RSPAMD_OVERRIDE_DIR: '/rspamd/custom/override.d' });
+  assert.equal(config.rspamdOverrideDir, '/rspamd/custom/override.d');
+
+  const defaultConfig = loadConfig({ DMS_ROOT: '/mail' });
+  assert.equal(defaultConfig.rspamdOverrideDir, path.join('/mail', 'rspamd', 'override.d'));
+});
+
 test('ensureTrackingFilter aborts when override directory is missing', async () => {
   const root = await makeTempDir();
   const source = path.join(root, 'email_tracking.lua');
   await fs.writeFile(source, '-- lua');
 
   await assert.rejects(
-    () => ensureTrackingFilter(path.join(root, 'missing-dms'), source),
+    () => ensureTrackingFilter(path.join(root, 'missing-rspamd', 'override.d'), source),
     /Required Rspamd override directory is missing/
   );
 });
@@ -47,7 +55,7 @@ test('ensureTrackingFilter does not overwrite an existing filter file', async ()
   await fs.writeFile(source, '-- new lua');
   await fs.writeFile(target, '-- existing lua');
 
-  await ensureTrackingFilter(dmsRoot, source);
+  await ensureTrackingFilter(overrideDir, source);
   assert.equal(await fs.readFile(target, 'utf8'), '-- existing lua');
 });
 
@@ -71,6 +79,7 @@ test('warning API reports missing tracking base URL and skips filter install', a
     port: 0,
     databasePath: dbPath,
     dmsRoot,
+    rspamdOverrideDir: overrideDir,
     trustProxy: false,
     trackingBaseUrl: null,
     trackingLuaSourcePath: luaSource,
@@ -99,11 +108,12 @@ test('warning API reports missing tracking base URL and skips filter install', a
 test('warning recheck clears override warning and installs the filter', async () => {
   const root = await makeTempDir();
   const dmsRoot = path.join(root, 'dms');
+  const rspamdOverrideDir = path.join(root, 'custom-rspamd', 'override.d');
   const publicDir = path.join(root, 'public');
   const publicDistDir = path.join(publicDir, 'dist');
   const luaSource = path.join(root, 'email_tracking.lua');
   const dbPath = path.join(root, 'data', 'tracker.sqlite');
-  const overrideDir = path.join(dmsRoot, 'rspamd', 'override.d');
+  const overrideDir = rspamdOverrideDir;
   const target = path.join(overrideDir, 'email_tracking.lua');
 
   await fs.mkdir(publicDistDir, { recursive: true });
@@ -115,6 +125,7 @@ test('warning recheck clears override warning and installs the filter', async ()
     port: 0,
     databasePath: dbPath,
     dmsRoot,
+    rspamdOverrideDir,
     trustProxy: false,
     trackingBaseUrl: 'https://tracker.example.com',
     trackingLuaSourcePath: luaSource,
@@ -168,6 +179,7 @@ test('tracking pixel endpoint records opens and returns a png', async () => {
     port: 0,
     databasePath: dbPath,
     dmsRoot,
+    rspamdOverrideDir: path.join(dmsRoot, 'rspamd', 'override.d'),
     trustProxy: true,
     trackingBaseUrl: 'https://tracker.example.com',
     trackingLuaSourcePath: luaSource,
