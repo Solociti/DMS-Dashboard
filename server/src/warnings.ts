@@ -39,7 +39,7 @@ async function collectTrackingWarnings(config: AppConfig): Promise<DashboardWarn
     warnings.push(
       createWarning(
         issue.code === 'ENOENT' ? 'rspamd-override-missing' : 'rspamd-override-unavailable',
-        'Rspamd override directory unavailable',
+        issue.code === 'ENOENT' ? 'Rspamd override directory is missing' : 'Rspamd override directory unavailable',
         issue.code === 'ENOENT'
           ? `${overrideDirectory} does not exist, so the tracking filter copy was skipped.`
           : `The tracking filter copy was skipped because ${overrideDirectory} could not be checked: ${issue.message}.`
