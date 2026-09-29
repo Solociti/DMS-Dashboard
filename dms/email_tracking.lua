@@ -2,8 +2,6 @@ local lua_mime = require "lua_mime"
 local rspamd_logger = require "rspamd_logger"
 local rspamd_trie = require "rspamd_trie"
 
-local body_close_pattern = rspamd_trie.create({ "</body>" }, rspamd_trie.flags.icase)
-
 local function url_encode(value)
   return (value:gsub("[^%w%-_%.~]", function(character)
     return string.format("%%%02X", string.byte(character))
@@ -50,9 +48,13 @@ rspamd_config:register_symbol({
       return
     end
 
-    local rewrite = lua_mime.multipattern_text_replace(task, body_close_pattern, {
-      pixel .. "</body>"
-    })
+    local existing_pixel_pattern = rspamd_trie.create({ pixel }, rspamd_trie.flags.icase)
+    local existing_pixel = lua_mime.multipattern_text_replace(task, existing_pixel_pattern, { pixel })
+    if existing_pixel and existing_pixel.out then
+      return
+    end
+
+    local rewrite = lua_mime.add_text_footer(task, pixel, nil)
 
     if not rewrite or not rewrite.out then
       return
