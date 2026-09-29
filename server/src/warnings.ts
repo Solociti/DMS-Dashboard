@@ -10,7 +10,7 @@ function createWarning(code: string, title: string, message: string): DashboardW
 
 async function collectTrackingWarnings(config: AppConfig): Promise<DashboardWarning[]> {
   const warnings: DashboardWarning[] = [];
-  const overrideDirectory = config.rspamdOverrideDir;
+  const rspamdDirectory = config.rspamdDir;
 
   if (!config.trackingBaseUrl) {
     warnings.push(
@@ -23,13 +23,13 @@ async function collectTrackingWarnings(config: AppConfig): Promise<DashboardWarn
   }
 
   try {
-    const stats = await fs.stat(overrideDirectory);
+    const stats = await fs.stat(rspamdDirectory);
     if (!stats.isDirectory()) {
       warnings.push(
         createWarning(
-          'rspamd-override-invalid',
-          'Rspamd override path is invalid',
-          `${overrideDirectory} exists but is not a directory, so the tracking filter was not installed.`
+          'rspamd-dir-invalid',
+          'Rspamd directory is invalid',
+          `${rspamdDirectory} exists but is not a directory, so the tracking filter was not installed.`
         )
       );
     }
@@ -37,11 +37,11 @@ async function collectTrackingWarnings(config: AppConfig): Promise<DashboardWarn
     const issue = error as NodeJS.ErrnoException;
     warnings.push(
       createWarning(
-        issue.code === 'ENOENT' ? 'rspamd-override-missing' : 'rspamd-override-unavailable',
-        issue.code === 'ENOENT' ? 'Rspamd override directory is missing' : 'Rspamd override directory unavailable',
+        issue.code === 'ENOENT' ? 'rspamd-dir-missing' : 'rspamd-dir-unavailable',
+        issue.code === 'ENOENT' ? 'Rspamd directory is missing' : 'Rspamd directory unavailable',
         issue.code === 'ENOENT'
-          ? `${overrideDirectory} does not exist, so the tracking filter copy was skipped.`
-          : `The tracking filter copy was skipped because ${overrideDirectory} could not be checked: ${issue.message}.`
+          ? `${rspamdDirectory} does not exist, so the tracking filter copy was skipped.`
+          : `The tracking filter copy was skipped because ${rspamdDirectory} could not be checked: ${issue.message}.`
       )
     );
   }
@@ -49,16 +49,16 @@ async function collectTrackingWarnings(config: AppConfig): Promise<DashboardWarn
   if (
     !config.trackingBaseUrl ||
     warnings.some((warning) =>
-      warning.code === 'rspamd-override-missing' ||
-      warning.code === 'rspamd-override-unavailable' ||
-      warning.code === 'rspamd-override-invalid'
+      warning.code === 'rspamd-dir-missing' ||
+      warning.code === 'rspamd-dir-unavailable' ||
+      warning.code === 'rspamd-dir-invalid'
     )
   ) {
     return warnings;
   }
 
   try {
-    await ensureTrackingFilter(config.rspamdOverrideDir, config.trackingLuaSourcePath);
+    await ensureTrackingFilter(config.rspamdDir, config.trackingLuaSourcePath, config.trackingBaseUrl);
   } catch (error) {
     warnings.push(
       createWarning(

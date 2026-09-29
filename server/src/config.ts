@@ -5,7 +5,7 @@ export interface AppConfig {
   port: number;
   databasePath: string;
   dmsRoot: string;
-  rspamdOverrideDir: string;
+  rspamdDir: string;
   trustProxy: boolean | number | string;
   trackingBaseUrl: string | null;
   trackingLuaSourcePath: string;
@@ -80,17 +80,17 @@ function parseLogFiles(raw: string | undefined, dmsRoot: string): Record<string,
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
   const appRoot = process.cwd();
   const dmsRoot = environment.DMS_ROOT || '/dms';
-  const rspamdOverrideDir = environment.RSPAMD_OVERRIDE_DIR || path.join(dmsRoot, 'rspamd', 'override.d');
+  const rspamdDir = environment.RSPAMD_DIR || path.join(dmsRoot, 'rspamd');
 
   return {
     appRoot,
     port: parseNumber(environment.PORT, 3000),
     databasePath: environment.DATABASE_PATH || '/data/tracker.sqlite',
     dmsRoot,
-    rspamdOverrideDir,
+    rspamdDir,
     trustProxy: parseTrustProxy(environment.TRUST_PROXY),
     trackingBaseUrl: parseTrackingBaseUrl(environment.TRACKING_BASE_URL),
-    trackingLuaSourcePath: path.join(appRoot, 'dms', 'email_tracking.lua'),
+    trackingLuaSourcePath: path.join(appRoot, 'dms', 'rspamd.local.lua'),
     publicRoot: path.join(appRoot, 'public'),
     publicDistRoot: path.join(appRoot, 'public', 'dist'),
     logFiles: parseLogFiles(environment.LOG_FILES, dmsRoot)
