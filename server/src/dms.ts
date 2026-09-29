@@ -1,46 +1,62 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import fs from "node:fs/promises";
+import path from "node:path";
 
 function quoteLuaString(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
 export async function ensureTrackingFilter(
   rspamdDirectory: string,
   trackingLuaSourcePath: string,
-  trackingBaseUrl: string
+  trackingBaseUrl: string,
 ): Promise<void> {
-  const stats = await fs.stat(rspamdDirectory).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === 'ENOENT') {
-      throw new Error(`Required Rspamd directory is missing: ${rspamdDirectory}`);
-    }
+  const stats = await fs
+    .stat(rspamdDirectory)
+    .catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") {
+        const msg = `Required Rspamd directory is missing: ${rspamdDirectory}`;
+        console.error(msg);
 
-    throw error;
-  });
+        throw new Error(msg);
+      }
+
+      throw error;
+    });
 
   if (!stats.isDirectory()) {
     throw new Error(`${rspamdDirectory} is not a directory`);
   }
 
-  const targetPath = path.join(rspamdDirectory, 'rspamd.local.lua');
-  const sourceTemplate = await fs.readFile(trackingLuaSourcePath, 'utf8');
+  const targetPath = path.join(rspamdDirectory, "rspamd.local.lua");
+  const sourceTemplate = await fs.readFile(trackingLuaSourcePath, "utf8");
   const placeholder = '"__TRACKING_BASE_URL__"';
   if (!sourceTemplate.includes(placeholder)) {
-    throw new Error(`Tracking URL placeholder is missing from ${trackingLuaSourcePath}`);
+    throw new Error(
+      `Tracking URL placeholder is missing from ${trackingLuaSourcePath}`,
+    );
   }
 
-  const source = sourceTemplate.replace(placeholder, quoteLuaString(trackingBaseUrl));
+  const source = sourceTemplate.replace(
+    placeholder,
+    quoteLuaString(trackingBaseUrl),
+  );
 
   try {
-    const existing = await fs.readFile(targetPath, 'utf8');
+    const existing = await fs.readFile(targetPath, "utf8");
     if (existing === source) {
+      console.log(`Tracking filter is up-to-date at ${targetPath}`);
       return;
     }
   } catch (error) {
-    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+    if (
+      !(error instanceof Error) ||
+      !("code" in error) ||
+      error.code !== "ENOENT"
+    ) {
       throw error;
     }
   }
 
-  await fs.writeFile(targetPath, source, 'utf8');
+  await fs.writeFile(targetPath, source, "utf8");
+  console.log(`Tracking filter has been updated at ${targetPath}`);
 }

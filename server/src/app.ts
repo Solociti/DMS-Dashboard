@@ -138,6 +138,10 @@ export function createApp(
           }
         });
 
+        console.log(
+          `[${new Date().toISOString()}] ${request.baseUrl} MessageId: ${msgId} IP: ${getClientIp(request)}`,
+        );
+
         void database("opens")
           .insert({
             msg_id: msgId,
