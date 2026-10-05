@@ -17,7 +17,7 @@ button {
   cursor: pointer;
 }
 button:hover { background: #21446b; }
-.page-shell { max-width: 1280px; margin: 0 auto; padding: 2rem; }
+.page-shell { width: 100%; padding: 2rem; }
 .hero, .panel, .stat-card, .tabs a {
   background: rgba(9, 19, 31, 0.7);
   border: 1px solid rgba(84, 125, 168, 0.25);
@@ -121,5 +121,6 @@ button:disabled { opacity: 0.6; cursor: wait; }
   .content-grid, .logs-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {
+  .page-shell { padding: 1rem; }
   .blacklist-input-row { grid-template-columns: 1fr; }
 }

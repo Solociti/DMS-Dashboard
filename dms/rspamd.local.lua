@@ -52,6 +52,7 @@ local function report_message(task, uid, message_id, sender_address, user)
     local body = ucl.to_format({
         uid = uid,
         message_id = message_id,
+        sent_at = task:get_date(),
         subject = task:get_subject(),
         sender = sender_address,
         recipients = recipients,

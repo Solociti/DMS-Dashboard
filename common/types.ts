@@ -2,6 +2,7 @@ export interface OpenSummary {
   msgId: string;
   totalOpens: number;
   lastOpened: string | null;
+  sentAt: string | null;
   subject: string | null;
   sender: string | null;
   recipients: string[];
