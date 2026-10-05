@@ -243,14 +243,14 @@ test("warning API reports missing tracking base URL and skips filter install", a
       "password-change-required",
     );
     const passwordChangeRedirect = await authFetch(
-      `${baseUrl}/dashboard`,
+      `${baseUrl}/dashboard/`,
       cookie,
       { redirect: "manual" },
     );
     assert.equal(passwordChangeRedirect.status, 302);
     assert.equal(
       passwordChangeRedirect.headers.get("location"),
-      "/login?returnTo=%2Fdashboard",
+      "/login?returnTo=%2Fdashboard%2F",
     );
 
     const unchangedPasswordResponse = await fetch(
@@ -276,7 +276,7 @@ test("warning API reports missing tracking base URL and skips filter install", a
     });
     assert.equal(passwordResponse.status, 204);
     const dashboardAfterReset = await authFetch(
-      `${baseUrl}/dashboard`,
+      `${baseUrl}/dashboard/`,
       cookie,
       { redirect: "manual" },
     );
