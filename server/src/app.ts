@@ -27,6 +27,7 @@ interface RawSummaryRow {
   msg_id: string;
   total_opens: number | string;
   last_opened: string | null;
+  sent_at: string | null;
   subject: string | null;
   sender: string | null;
   recipients: string | null;
@@ -35,6 +36,19 @@ interface RawSummaryRow {
 function optionalString(value: unknown, maxLength: number): string | null {
   return typeof value === "string" && value.length > 0
     ? value.slice(0, maxLength)
+    : null;
+}
+
+function normalizeSentAt(value: unknown): string | null {
+  const timestamp =
+    typeof value === "number" && Number.isFinite(value)
+      ? new Date(value * 1000)
+      : typeof value === "string" && value.length > 0
+        ? new Date(value)
+        : null;
+
+  return timestamp && Number.isFinite(timestamp.getTime())
+    ? timestamp.toISOString()
     : null;
 }
 
@@ -104,6 +118,7 @@ async function getOpenSummaries(database: Knex): Promise<OpenSummary[]> {
       "messages.subject as subject",
       "messages.sender as sender",
       "messages.recipients as recipients",
+      "messages.sent_at as sent_at",
     )
     .count<{ total_opens: number | string }>({ total_opens: "*" })
     .max({ last_opened: "opens.created_at" })
@@ -112,6 +127,7 @@ async function getOpenSummaries(database: Knex): Promise<OpenSummary[]> {
       "messages.subject",
       "messages.sender",
       "messages.recipients",
+      "messages.sent_at",
     )
     .orderBy("last_opened", "desc")) as unknown as RawSummaryRow[];
 
@@ -119,6 +135,7 @@ async function getOpenSummaries(database: Knex): Promise<OpenSummary[]> {
     msgId: row.msg_id,
     totalOpens: Number(row.total_opens),
     lastOpened: row.last_opened,
+    sentAt: row.sent_at,
     subject: row.subject,
     sender: row.sender,
     recipients: parseRecipients(row.recipients),
@@ -243,6 +260,7 @@ export function createApp(
           .insert({
             uid,
             message_id: optionalString(body.message_id, 998),
+            sent_at: normalizeSentAt(body.sent_at),
             subject: optionalString(body.subject, 998),
             sender: optionalString(body.sender, 320),
             recipients: JSON.stringify(recipients),

@@ -332,6 +332,7 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
     rspamdDir,
     trustProxy: true,
     trackingBaseUrl: "https://tracker.example.com",
+    trackingApiToken: "test-token",
     trackingLuaSourcePath: luaSource,
     publicRoot: publicDir,
     publicDistRoot: publicDistDir,
@@ -345,6 +346,24 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
   try {
     const address = server.address();
     const baseUrl = `http://127.0.0.1:${address.port}`;
+    const sentAt = "2026-10-01T12:30:00.000Z";
+    const metadataResponse = await fetch(`${baseUrl}/api/messages`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer test-token",
+      },
+      body: JSON.stringify({
+        uid: "message-123",
+        message_id: "<message-123@example.com>",
+        sent_at: Date.parse(sentAt) / 1000,
+        subject: "Sent date test",
+        sender: "sender@example.com",
+        recipients: ["recipient@example.com"],
+      }),
+    });
+    assert.equal(metadataResponse.status, 204);
+
     const pixelResponse = await fetch(`${baseUrl}/open/message-123.png`, {
       headers: {
         "x-forwarded-for": "203.0.113.10, 10.0.0.5",
@@ -368,6 +387,8 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
     assert.equal(summaries.length, 1);
     assert.equal(summaries[0].msgId, "message-123");
     assert.equal(summaries[0].totalOpens, 1);
+    assert.equal(summaries[0].sentAt, sentAt);
+    assert.equal(summaries[0].subject, "Sent date test");
 
     const entries = await waitFor(async () => {
       const response = await fetch(`${baseUrl}/api/opens/message-123`);
