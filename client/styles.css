@@ -89,8 +89,37 @@ tbody tr:hover, .log-list button:hover { background: rgba(134, 185, 243, 0.08); 
   border: 1px solid rgba(84, 125, 168, 0.18);
   white-space: pre-wrap;
 }
+.blacklist-form { display: grid; gap: 0.55rem; max-width: 760px; }
+.blacklist-form label { color: #c4d3e2; font-size: 0.9rem; }
+.blacklist-input-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.75rem; }
+.blacklist-input-row input {
+  min-width: 0;
+  border: 1px solid rgba(84, 125, 168, 0.45);
+  border-radius: 12px;
+  background: #050b12;
+  color: #e5eef8;
+  padding: 0.7rem 0.9rem;
+  font: inherit;
+}
+.blacklist-input-row input:focus { outline: 2px solid #86b9f3; outline-offset: 2px; }
+.blacklist-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.blacklist-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(84, 125, 168, 0.2);
+  background: rgba(9, 19, 31, 0.55);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+}
+.blacklist-list code { min-width: 0; overflow-wrap: anywhere; color: #c4d3e2; }
+button:disabled { opacity: 0.6; cursor: wait; }
 .hidden { display: none; }
 @media (max-width: 960px) {
   .hero, .panel-heading { flex-direction: column; align-items: stretch; }
   .content-grid, .logs-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .blacklist-input-row { grid-template-columns: 1fr; }
 }

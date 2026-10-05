@@ -61,14 +61,15 @@ test("ensureTrackingFilter replaces an existing filter when its contents differ"
   await fs.mkdir(rspamdDir, { recursive: true });
   await fs.writeFile(
     source,
-    'local tracking_base_url = "__TRACKING_BASE_URL__"',
+    'local tracking_base_url = "__TRACKING_BASE_URL__"\nlocal TRACKING_API_TOKEN = "__TRACKING_API_TOKEN__"',
   );
   await fs.writeFile(target, "-- existing lua");
 
-  await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
+  const token = await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
+  assert.match(token, /^[0-9a-f]{64}$/);
   assert.equal(
     await fs.readFile(target, "utf8"),
-    'local tracking_base_url = "https://tracker.example.com"',
+    `local tracking_base_url = "https://tracker.example.com"\nlocal TRACKING_API_TOKEN = "${token}"`,
   );
 });
 
@@ -79,20 +80,17 @@ test("ensureTrackingFilter leaves an identical filter unchanged", async () => {
   const target = path.join(rspamdDir, "rspamd.local.lua");
 
   await fs.mkdir(rspamdDir, { recursive: true });
+  const existingToken = "a".repeat(64);
+  const installed = `local tracking_base_url = "https://tracker.example.com"\nlocal TRACKING_API_TOKEN = "${existingToken}"`;
   await fs.writeFile(
     source,
-    'local tracking_base_url = "__TRACKING_BASE_URL__"',
+    'local tracking_base_url = "__TRACKING_BASE_URL__"\nlocal TRACKING_API_TOKEN = "__TRACKING_API_TOKEN__"',
   );
-  await fs.writeFile(
-    target,
-    'local tracking_base_url = "https://tracker.example.com"',
-  );
+  await fs.writeFile(target, installed);
 
-  await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
-  assert.equal(
-    await fs.readFile(target, "utf8"),
-    'local tracking_base_url = "https://tracker.example.com"',
-  );
+  const token = await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
+  assert.equal(token, existingToken);
+  assert.equal(await fs.readFile(target, "utf8"), installed);
 });
 
 test("warning API reports missing tracking base URL and skips filter install", async () => {
@@ -160,7 +158,10 @@ test("warning recheck clears missing directory warning and installs the filter",
   const target = path.join(rspamdDir, "rspamd.local.lua");
 
   await fs.mkdir(publicDistDir, { recursive: true });
-  await fs.writeFile(luaSource, "-- lua");
+  await fs.writeFile(
+    luaSource,
+    'local tracking_base_url = "__TRACKING_BASE_URL__"\nlocal TRACKING_API_TOKEN = "__TRACKING_API_TOKEN__"',
+  );
   await fs.writeFile(
     path.join(publicDistDir, "index.html"),
     "<!doctype html><title>ok</title>",
@@ -196,10 +197,100 @@ test("warning recheck clears missing directory warning and installs the filter",
       await fetch(`${baseUrl}/api/warnings/recheck`, { method: "POST" })
     ).json();
     assert.equal(refreshedState.warnings.length, 0);
-    assert.equal(
+    assert.match(
       await fs.readFile(target, "utf8"),
-      'local tracking_base_url = "https://tracker.example.com"',
+      /^local tracking_base_url = "https:\/\/tracker\.example\.com"\nlocal TRACKING_API_TOKEN = "[0-9a-f]{64}"$/,
     );
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+    await database.destroy();
+  }
+});
+
+test("tracking blacklist API validates and persists sender addresses", async () => {
+  const root = await makeTempDir();
+  const rspamdDir = path.join(root, "rspamd");
+  const publicDir = path.join(root, "public");
+  const publicDistDir = path.join(publicDir, "dist");
+  const luaSource = path.join(root, "rspamd.local.lua");
+  const dbPath = path.join(root, "data", "tracker.sqlite");
+  const blacklistPath = path.join(rspamdDir, "tracking-blacklist.txt");
+
+  await fs.mkdir(rspamdDir, { recursive: true });
+  await fs.mkdir(publicDistDir, { recursive: true });
+  await fs.writeFile(
+    luaSource,
+    'local tracking_base_url = "__TRACKING_BASE_URL__"',
+  );
+  await fs.writeFile(
+    path.join(publicDistDir, "index.html"),
+    "<!doctype html><title>ok</title>",
+  );
+
+  const { app, database } = await createServerApplication({
+    appRoot: root,
+    port: 0,
+    databasePath: dbPath,
+    dmsRoot: root,
+    rspamdDir,
+    trustProxy: false,
+    trackingBaseUrl: "https://tracker.example.com",
+    trackingLuaSourcePath: luaSource,
+    publicRoot: publicDir,
+    publicDistRoot: publicDistDir,
+    logFiles: {},
+  });
+
+  const server = await new Promise((resolve) => {
+    const instance = app.listen(0, () => resolve(instance));
+  });
+
+  try {
+    const address = server.address();
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    const initial = await (
+      await fetch(`${baseUrl}/api/tracking-blacklist`)
+    ).json();
+    assert.deepEqual(initial.addresses, []);
+
+    const added = await fetch(`${baseUrl}/api/tracking-blacklist`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address: " Newsletter@Example.COM " }),
+    });
+    assert.equal(added.status, 200);
+    assert.deepEqual((await added.json()).addresses, [
+      "newsletter@example.com",
+    ]);
+    assert.equal(
+      await fs.readFile(blacklistPath, "utf8"),
+      "newsletter@example.com\n",
+    );
+
+    const duplicate = await fetch(`${baseUrl}/api/tracking-blacklist`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address: "newsletter@example.com" }),
+    });
+    assert.deepEqual((await duplicate.json()).addresses, [
+      "newsletter@example.com",
+    ]);
+
+    const invalid = await fetch(`${baseUrl}/api/tracking-blacklist`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address: "not-an-email" }),
+    });
+    assert.equal(invalid.status, 400);
+
+    const removed = await fetch(
+      `${baseUrl}/api/tracking-blacklist/${encodeURIComponent("newsletter@example.com")}`,
+      { method: "DELETE" },
+    );
+    assert.deepEqual((await removed.json()).addresses, []);
+    assert.equal(await fs.readFile(blacklistPath, "utf8"), "");
   } finally {
     await new Promise((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

@@ -1,7 +1,29 @@
 local lua_mime = require "lua_mime"
 local rspamd_logger = require "rspamd_logger"
+local rspamd_http = require "rspamd_http"
+local ucl = require "ucl"
 
 local TRACKING_DOMAIN = "__TRACKING_BASE_URL__"
+local TRACKING_API_TOKEN = "__TRACKING_API_TOKEN__"
+local TRACKING_BLACKLIST_PATH = "/etc/rspamd/tracking-blacklist.txt"
+
+local function is_blacklisted_sender(address)
+    local blacklist = io.open(TRACKING_BLACKLIST_PATH, "r")
+
+    if not blacklist then
+        return false
+    end
+
+    for blacklisted_sender in blacklist:lines() do
+        if address:lower() == blacklisted_sender:lower() then
+            blacklist:close()
+            return true
+        end
+    end
+
+    blacklist:close()
+    return false
+end
 
 local function newline(task)
     local t = task:get_newlines_type()
@@ -15,11 +37,67 @@ local function newline(task)
     return "\r\n"
 end
 
+local function report_message(task, uid, message_id, sender_address, user)
+    if TRACKING_API_TOKEN == "" then
+        return
+    end
+
+    local recipients = {}
+    for _, rcpt in ipairs(task:get_recipients("mime") or {}) do
+        if rcpt.addr then
+            recipients[#recipients + 1] = rcpt.addr
+        end
+    end
+
+    local body = ucl.to_format({
+        uid = uid,
+        message_id = message_id,
+        subject = task:get_subject(),
+        sender = sender_address,
+        recipients = recipients,
+        user = user,
+    }, "json-compact")
+
+    rspamd_http.request({
+        task = task,
+        url = string.format("https://%s/api/messages", TRACKING_DOMAIN),
+        method = "POST",
+        body = body,
+        headers = {
+            ["Content-Type"] = "application/json",
+            ["Authorization"] = "Bearer " .. TRACKING_API_TOKEN,
+        },
+        timeout = 5,
+        callback = function(err, code)
+            if err or (code ~= 200 and code ~= 204) then
+                rspamd_logger.warnx(
+                    task,
+                    "TRACKING_PIXEL: metadata report failed: %s (HTTP %s)",
+                    tostring(err),
+                    tostring(code)
+                )
+            end
+        end,
+    })
+end
+
 local function inject_tracking_pixel(task)
     local user = task:get_user()
 
     -- Only modify authenticated outbound mail.
     if not user then
+        return
+    end
+
+    local sender = task:get_from("mime")
+    local sender_address = sender and sender.addr
+
+    if sender_address and is_blacklisted_sender(sender_address) then
+        rspamd_logger.infox(
+            task,
+            "TRACKING_PIXEL: skipping blacklisted sender %s",
+            sender_address
+        )
         return
     end
 
@@ -33,17 +111,22 @@ local function inject_tracking_pixel(task)
         return
     end
 
+    local uid = task:get_uid()
+
     local pixel = string.format(
         '<img src="https://%s/open/%s.png" alt="" width="1" height="1" style="display:block;width:1px;height:1px;border:0;overflow:hidden;" />',
         TRACKING_DOMAIN,
-        message_id
+        uid
     )
 
     rspamd_logger.infox(
         task,
-        "TRACKING_PIXEL: injecting pixel for %s",
+        "TRACKING_PIXEL: injecting pixel for %s (%s)",
+        uid,
         message_id
     )
+
+    report_message(task, uid, message_id, sender_address, user)
 
     local rewrite = lua_mime.add_text_footer(
         task,

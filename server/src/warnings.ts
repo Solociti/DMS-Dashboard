@@ -58,7 +58,7 @@ async function collectTrackingWarnings(config: AppConfig): Promise<DashboardWarn
   }
 
   try {
-    await ensureTrackingFilter(config.rspamdDir, config.trackingLuaSourcePath, config.trackingBaseUrl);
+    config.trackingApiToken = await ensureTrackingFilter(config.rspamdDir, config.trackingLuaSourcePath, config.trackingBaseUrl);
   } catch (error) {
     warnings.push(
       createWarning(

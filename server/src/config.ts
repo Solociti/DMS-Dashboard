@@ -8,6 +8,7 @@ export interface AppConfig {
   rspamdDir: string;
   trustProxy: boolean | number | string;
   trackingBaseUrl: string | null;
+  trackingApiToken: string | null;
   trackingLuaSourcePath: string;
   publicRoot: string;
   publicDistRoot: string;
@@ -90,6 +91,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     rspamdDir,
     trustProxy: parseTrustProxy(environment.TRUST_PROXY),
     trackingBaseUrl: parseTrackingBaseUrl(environment.TRACKING_BASE_URL),
+    trackingApiToken: null,
     trackingLuaSourcePath: path.join(appRoot, 'dms', 'rspamd.local.lua'),
     publicRoot: path.join(appRoot, 'public'),
     publicDistRoot: path.join(appRoot, 'public', 'dist'),

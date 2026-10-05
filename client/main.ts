@@ -4,6 +4,7 @@ import type {
   LogFileResponse,
   OpenLogEntry,
   OpenSummary,
+  TrackingBlacklistResponse,
   WarningState
 } from '../common/types';
 
@@ -25,6 +26,13 @@ const tailLogButton = document.querySelector<HTMLButtonElement>('#tail-log');
 const refreshWarningsButton = document.querySelector<HTMLButtonElement>('#refresh-warnings');
 const overviewView = document.querySelector<HTMLElement>('#overview-view');
 const logsView = document.querySelector<HTMLElement>('#logs-view');
+const blacklistView = document.querySelector<HTMLElement>('#blacklist-view');
+const blacklistForm = document.querySelector<HTMLFormElement>('#blacklist-form');
+const blacklistInput = document.querySelector<HTMLInputElement>('#blacklist-address');
+const blacklistCount = document.querySelector<HTMLParagraphElement>('#blacklist-count');
+const blacklistStatus = document.querySelector<HTMLParagraphElement>('#blacklist-status');
+const blacklistList = document.querySelector<HTMLUListElement>('#blacklist-list');
+const addBlacklistAddressButton = document.querySelector<HTMLButtonElement>('#add-blacklist-address');
 const tabs = Array.from(document.querySelectorAll<HTMLAnchorElement>('.tabs a'));
 
 let selectedMessageId: string | null = null;
@@ -33,6 +41,10 @@ let logPoller: number | undefined;
 
 function isLogsRoute(): boolean {
   return window.location.pathname.startsWith('/dashboard/logs');
+}
+
+function isBlacklistRoute(): boolean {
+  return window.location.pathname.startsWith('/dashboard/blacklist');
 }
 
 function formatDate(value: string | null): string {
@@ -133,7 +145,15 @@ function runWarningTask(task: () => Promise<void>): void {
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status}) for ${url}`);
+    let message = `Request failed (${response.status}) for ${url}`;
+    try {
+      const payload = await response.json() as { error?: string };
+      message = payload.error || message;
+    } catch {
+      // Keep the status-based message when the response is not JSON.
+    }
+
+    throw new Error(message);
   }
 
   return response.json() as Promise<T>;
@@ -141,10 +161,16 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 function updateTabs(): void {
   const logsRoute = isLogsRoute();
-  overviewView?.classList.toggle('hidden', logsRoute);
+  const blacklistRoute = isBlacklistRoute();
+  overviewView?.classList.toggle('hidden', logsRoute || blacklistRoute);
   logsView?.classList.toggle('hidden', !logsRoute);
+  blacklistView?.classList.toggle('hidden', !blacklistRoute);
   tabs.forEach((tab) => {
-    const active = logsRoute ? tab.dataset.tab === 'logs' : tab.dataset.tab === 'overview';
+    const active = blacklistRoute
+      ? tab.dataset.tab === 'blacklist'
+      : logsRoute
+        ? tab.dataset.tab === 'logs'
+        : tab.dataset.tab === 'overview';
     tab.classList.toggle('active', active);
   });
 
@@ -160,6 +186,21 @@ async function loadWarnings(recheck = false): Promise<void> {
     method: recheck ? 'POST' : 'GET'
   });
   renderWarnings(state);
+}
+
+function createMessageCell(row: OpenSummary): HTMLTableCellElement {
+  const cell = createElement('td');
+  if (!row.subject && !row.sender && row.recipients.length === 0) {
+    cell.textContent = row.msgId;
+    return cell;
+  }
+
+  cell.append(createElement('strong', row.subject ?? '(no subject)'));
+  cell.append(document.createElement('br'));
+  cell.append(createElement('span', `From: ${row.sender ?? 'Unknown'}`));
+  cell.append(document.createElement('br'));
+  cell.append(createElement('span', `To: ${row.recipients.join(', ') || 'Unknown'}`));
+  return cell;
 }
 
 async function loadMetrics(): Promise<void> {
@@ -193,7 +234,7 @@ async function loadMetrics(): Promise<void> {
       const tableRow = createElement('tr');
       tableRow.dataset.msgId = row.msgId;
       tableRow.append(
-        createElement('td', row.msgId),
+        createMessageCell(row),
         createElement('td', String(row.totalOpens)),
         createElement('td', formatDate(row.lastOpened))
       );
@@ -298,6 +339,69 @@ async function loadLogContent(): Promise<void> {
   logContent.textContent = response.content || 'No log content available.';
 }
 
+function renderBlacklist(addresses: string[]): void {
+  if (!blacklistCount || !blacklistList) {
+    return;
+  }
+
+  blacklistCount.textContent = `${addresses.length} sender${addresses.length === 1 ? '' : 's'} excluded`;
+  if (addresses.length === 0) {
+    replaceChildren(blacklistList, createElement('li', 'No senders are excluded.'));
+    return;
+  }
+
+  replaceChildren(
+    blacklistList,
+    ...addresses.map((address) => {
+      const item = createElement('li');
+      const value = createElement('code', address);
+      const removeButton = createElement('button', 'Remove');
+      removeButton.type = 'button';
+      removeButton.setAttribute('aria-label', `Remove ${address} from the exclusion list`);
+      removeButton.addEventListener('click', async () => {
+        removeButton.disabled = true;
+        if (blacklistStatus) {
+          blacklistStatus.textContent = `Removing ${address}…`;
+        }
+
+        try {
+          const response = await fetchJson<TrackingBlacklistResponse>(
+            `/api/tracking-blacklist/${encodeURIComponent(address)}`,
+            { method: 'DELETE' }
+          );
+          renderBlacklist(response.addresses);
+          if (blacklistStatus) {
+            blacklistStatus.textContent = `${address} removed.`;
+          }
+        } catch (error) {
+          removeButton.disabled = false;
+          if (blacklistStatus) {
+            blacklistStatus.textContent = getErrorMessage(error);
+          }
+        }
+      });
+      item.append(value, removeButton);
+      return item;
+    })
+  );
+}
+
+async function loadBlacklist(): Promise<void> {
+  const response = await fetchJson<TrackingBlacklistResponse>('/api/tracking-blacklist');
+  renderBlacklist(response.addresses);
+}
+
+function runBlacklistTask(task: () => Promise<void>): void {
+  task().catch((error) => {
+    if (blacklistStatus) {
+      blacklistStatus.textContent = getErrorMessage(error);
+    }
+    if (blacklistList) {
+      replaceChildren(blacklistList, createElement('li', 'Could not load excluded senders.'));
+    }
+  });
+}
+
 function startLogPolling(): void {
   if (logPoller) {
     return;
@@ -341,11 +445,56 @@ refreshLogsButton?.addEventListener('click', () => runLogTask(loadLogs));
 tailLogButton?.addEventListener('click', () => runLogTask(loadLogContent));
 refreshWarningsButton?.addEventListener('click', () => runWarningTask(() => loadWarnings(true)));
 
+blacklistForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const address = blacklistInput?.value.trim();
+  if (!address || !blacklistInput?.validity.valid) {
+    blacklistInput?.reportValidity();
+    return;
+  }
+
+  if (addBlacklistAddressButton) {
+    addBlacklistAddressButton.disabled = true;
+  }
+  if (blacklistStatus) {
+    blacklistStatus.textContent = `Adding ${address}…`;
+  }
+
+  try {
+    const response = await fetchJson<TrackingBlacklistResponse>('/api/tracking-blacklist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address })
+    });
+    renderBlacklist(response.addresses);
+    if (blacklistInput) {
+      blacklistInput.value = '';
+      blacklistInput.focus();
+    }
+    if (blacklistStatus) {
+      blacklistStatus.textContent = `${address} added to the exclusion list.`;
+    }
+  } catch (error) {
+    if (blacklistStatus) {
+      blacklistStatus.textContent = getErrorMessage(error);
+    }
+  } finally {
+    if (addBlacklistAddressButton) {
+      addBlacklistAddressButton.disabled = false;
+    }
+  }
+});
+
 function initializeView(): void {
   runWarningTask(() => loadWarnings(false));
 
   if (isLogsRoute()) {
     runLogTask(loadLogs);
+    return;
+  }
+
+  if (isBlacklistRoute()) {
+    runBlacklistTask(loadBlacklist);
     return;
   }
 

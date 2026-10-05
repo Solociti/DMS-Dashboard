@@ -2,6 +2,9 @@ export interface OpenSummary {
   msgId: string;
   totalOpens: number;
   lastOpened: string | null;
+  subject: string | null;
+  sender: string | null;
+  recipients: string[];
 }
 
 export interface OpenLogEntry {
@@ -34,4 +37,8 @@ export interface DashboardWarning {
 export interface WarningState {
   warnings: DashboardWarning[];
   checkedAt: string | null;
+}
+
+export interface TrackingBlacklistResponse {
+  addresses: string[];
 }
