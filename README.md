@@ -25,6 +25,17 @@ Copy `example.env` and adjust values as needed:
 - The dashboard stores excluded sender addresses in `tracking-blacklist.txt` beside the generated Rspamd filter.
 - `LOG_FILES`: comma-separated log aliases and paths, for example `rspamd:/dms/logs/rspamd.log,mail:/dms/logs/mail.log`
 
+## Dashboard accounts
+
+On startup, the dashboard creates a temporary admin account if `admin@example.com` is not already present:
+
+- Email: `admin@example.com`
+- Temporary password: `changeme123`
+
+The first login requires setting a new password. Passwords must be 12 to 128 characters. Use the Users view to change the email or password of any listed account; leave the new-password field blank to keep its current password.
+
+Changing the temporary admin account's email currently causes startup to create `admin@example.com` again with the temporary password. Change its password, but leave its email unchanged until startup account seeding is updated.
+
 For tracking mail sent through authenticated SMTP accounts, Docker Mailserver must run Rspamd checks for authenticated users. Set `RSPAMD_CHECK_AUTHENTICATED=1` on the Docker Mailserver container; its default is `0`, which skips those messages and prevents the tracking postfilter from running. This enables the default Rspamd checks for authenticated mail, not only the tracking filter. The tracking filter only modifies messages with an authenticated user, so ordinary inbound mail is not changed.
 
 ## Mailserver Rspamd setup

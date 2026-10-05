@@ -6,6 +6,15 @@ import type { Knex } from "knex";
 
 import type { OpenLogEntry, OpenSummary } from "../../common/types";
 import type { AppConfig } from "./config";
+import {
+  clearSessionCookie,
+  createSession,
+  destroySession,
+  getAuthenticatedUser,
+  hashPassword,
+  setSessionCookie,
+  verifyPassword,
+} from "./auth";
 import { listLogFiles, readLogFile, type LogRegistry } from "./logs";
 import {
   InvalidBlacklistAddressError,
@@ -168,6 +177,7 @@ export function createApp(
   const opensApiLimiter = createRateLimiter(240, 60_000);
   const rateLimiter = createRateLimiter(120, 60_000);
   const ingestLimiter = createRateLimiter(600, 60_000);
+  const loginLimiter = createRateLimiter(8, 15 * 60_000);
 
   const trackingBlacklist = new TrackingBlacklistStore(
     path.join(config.rspamdDir, "tracking-blacklist.txt"),
@@ -186,6 +196,112 @@ export function createApp(
     "/dashboard",
     express.static(config.publicDistRoot, { index: false }),
   );
+
+  app.post("/api/auth/login", loginLimiter, async (request, response, next) => {
+    try {
+      const email =
+        typeof request.body?.email === "string"
+          ? request.body.email.trim().toLowerCase()
+          : "";
+      const password =
+        typeof request.body?.password === "string" ? request.body.password : "";
+      const user = await database("users").where({ email }).first();
+      if (!user || !(await verifyPassword(password, user.password_hash))) {
+        response.status(401).json({ error: "Invalid email or password" });
+        return;
+      }
+
+      const mustChangePassword =
+        Boolean(user.must_change_password) || password === "password123";
+      if (mustChangePassword && !user.must_change_password) {
+        await database("users").where({ id: user.id }).update({
+          must_change_password: true,
+        });
+      }
+
+      const token = await createSession(database, user.id);
+      setSessionCookie(response, token, request.secure);
+      response.json({
+        authenticated: true,
+        email: user.email,
+        mustChangePassword,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/auth/session", async (request, response, next) => {
+    try {
+      const user = await getAuthenticatedUser(database, request);
+      response.json(
+        user
+          ? {
+              authenticated: true,
+              email: user.email,
+              mustChangePassword: user.mustChangePassword,
+            }
+          : { authenticated: false },
+      );
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/auth/logout", async (request, response, next) => {
+    try {
+      await destroySession(database, request);
+      clearSessionCookie(response, request.secure);
+      response.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/auth/password", async (request, response, next) => {
+    try {
+      const user = await getAuthenticatedUser(database, request);
+      if (!user) {
+        response.status(401).json({ error: "Authentication required" });
+        return;
+      }
+
+      const password = request.body?.password;
+      if (
+        typeof password !== "string" ||
+        password.length < 12 ||
+        password.length > 128
+      ) {
+        response.status(400).json({
+          error: "Password must be between 12 and 128 characters",
+        });
+        return;
+      }
+
+      if (password === "password123") {
+        response.status(400).json({ error: "Choose a different password" });
+        return;
+      }
+
+      const storedUser = await database("users")
+        .where({ id: user.id })
+        .first("password_hash");
+      if (await verifyPassword(password, storedUser.password_hash)) {
+        response.status(400).json({ error: "Choose a different password" });
+        return;
+      }
+
+      await database("users")
+        .where({ id: user.id })
+        .update({
+          password_hash: await hashPassword(password),
+          must_change_password: false,
+        });
+      response.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  });
 
   app.get("/", (_request: Request, response: Response) => {
     response.redirect("/dashboard");
@@ -271,6 +387,117 @@ export function createApp(
 
         response.status(204).end();
       } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.use("/api", async (request, response, next) => {
+    try {
+      const user = await getAuthenticatedUser(database, request);
+      if (!user) {
+        response.status(401).json({ error: "Authentication required" });
+        return;
+      }
+
+      if (user.mustChangePassword) {
+        response.status(403).json({
+          error: "Update your password before continuing",
+          code: "password-change-required",
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/users", rateLimiter, async (_request, response, next) => {
+    try {
+      const users = await database("users")
+        .select("id", "email", "created_at")
+        .orderBy("email", "asc");
+      response.json(
+        users.map((user) => ({
+          id: user.id,
+          email: user.email,
+          createdAt: user.created_at,
+        })),
+      );
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.put(
+    "/api/users/:userId",
+    rateLimiter,
+    async (request, response, next) => {
+      try {
+        const userId = Number(getRouteParam(request.params.userId));
+        if (!Number.isSafeInteger(userId) || userId < 1) {
+          response.status(400).json({ error: "Invalid user id" });
+          return;
+        }
+
+        const email =
+          typeof request.body?.email === "string"
+            ? request.body.email.trim().toLowerCase()
+            : "";
+        if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email)) {
+          response.status(400).json({ error: "Enter a valid email address" });
+          return;
+        }
+
+        const password = request.body?.password;
+        if (
+          password !== undefined &&
+          password !== "" &&
+          (typeof password !== "string" ||
+            password.length < 12 ||
+            password.length > 128)
+        ) {
+          response.status(400).json({
+            error: "Password must be between 12 and 128 characters",
+          });
+          return;
+        }
+        if (password === "password123") {
+          response.status(400).json({ error: "Choose a different password" });
+          return;
+        }
+
+        const existingUser = await database("users")
+          .where({ id: userId })
+          .first("id");
+        if (!existingUser) {
+          response.status(404).json({ error: "User not found" });
+          return;
+        }
+
+        const updates: {
+          email: string;
+          password_hash?: string;
+          must_change_password?: boolean;
+        } = { email };
+        if (typeof password === "string" && password.length > 0) {
+          updates.password_hash = await hashPassword(password);
+          updates.must_change_password = false;
+        }
+
+        await database("users").where({ id: userId }).update(updates);
+        response.json({ id: userId, email });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes("UNIQUE constraint failed: users.email")
+        ) {
+          response.status(409).json({ error: "That email is already in use" });
+          return;
+        }
+
         next(error);
       }
     },

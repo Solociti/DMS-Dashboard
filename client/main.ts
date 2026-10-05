@@ -35,6 +35,7 @@ const refreshWarningsButton =
 const overviewView = document.querySelector<HTMLElement>("#overview-view");
 const logsView = document.querySelector<HTMLElement>("#logs-view");
 const blacklistView = document.querySelector<HTMLElement>("#blacklist-view");
+const usersView = document.querySelector<HTMLElement>("#users-view");
 const blacklistForm =
   document.querySelector<HTMLFormElement>("#blacklist-form");
 const blacklistInput =
@@ -45,12 +46,33 @@ const blacklistStatus =
   document.querySelector<HTMLParagraphElement>("#blacklist-status");
 const blacklistList =
   document.querySelector<HTMLUListElement>("#blacklist-list");
+const usersTableBody =
+  document.querySelector<HTMLTableSectionElement>("#users-table-body");
+const usersStatus = document.querySelector<HTMLParagraphElement>("#users-status");
 const addBlacklistAddressButton = document.querySelector<HTMLButtonElement>(
   "#add-blacklist-address",
 );
 const tabs = Array.from(
   document.querySelectorAll<HTMLAnchorElement>(".tabs a"),
 );
+const authGate = document.querySelector<HTMLElement>("#auth-gate");
+const dashboardContent = document.querySelector<HTMLElement>("#dashboard-content");
+const loginForm = document.querySelector<HTMLFormElement>("#login-form");
+const passwordForm = document.querySelector<HTMLFormElement>("#password-form");
+const authStatus = document.querySelector<HTMLParagraphElement>("#auth-status");
+const logoutButton = document.querySelector<HTMLButtonElement>("#logout-button");
+
+interface AuthSession {
+  authenticated: boolean;
+  email?: string;
+  mustChangePassword?: boolean;
+}
+
+interface ManagedUser {
+  id: number;
+  email: string;
+  createdAt: string;
+}
 
 let selectedMessageId: string | null = null;
 let selectedLogName: string | null = null;
@@ -62,6 +84,10 @@ function isLogsRoute(): boolean {
 
 function isBlacklistRoute(): boolean {
   return window.location.pathname.startsWith("/dashboard/blacklist");
+}
+
+function isUsersRoute(): boolean {
+  return window.location.pathname.startsWith("/dashboard/users");
 }
 
 function formatDate(value: string | null): string {
@@ -201,15 +227,22 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 function updateTabs(): void {
   const logsRoute = isLogsRoute();
   const blacklistRoute = isBlacklistRoute();
-  overviewView?.classList.toggle("hidden", logsRoute || blacklistRoute);
+  const usersRoute = isUsersRoute();
+  overviewView?.classList.toggle(
+    "hidden",
+    logsRoute || blacklistRoute || usersRoute,
+  );
   logsView?.classList.toggle("hidden", !logsRoute);
   blacklistView?.classList.toggle("hidden", !blacklistRoute);
+  usersView?.classList.toggle("hidden", !usersRoute);
   tabs.forEach((tab) => {
-    const active = blacklistRoute
-      ? tab.dataset.tab === "blacklist"
-      : logsRoute
-        ? tab.dataset.tab === "logs"
-        : tab.dataset.tab === "overview";
+    const active = usersRoute
+      ? tab.dataset.tab === "users"
+      : blacklistRoute
+        ? tab.dataset.tab === "blacklist"
+        : logsRoute
+          ? tab.dataset.tab === "logs"
+          : tab.dataset.tab === "overview";
     tab.classList.toggle("active", active);
   });
 
@@ -472,6 +505,85 @@ async function loadBlacklist(): Promise<void> {
   renderBlacklist(response.addresses);
 }
 
+function renderUsers(users: ManagedUser[]): void {
+  if (!usersTableBody) {
+    return;
+  }
+
+  if (usersStatus) {
+    usersStatus.textContent = `${users.length} user${users.length === 1 ? "" : "s"}`;
+  }
+
+  replaceChildren(
+    usersTableBody,
+    ...users.map((user) => {
+      const row = createElement("tr");
+      const idCell = createElement("td", String(user.id));
+      idCell.classList.add("user-id");
+      const emailCell = createElement("td");
+      const emailInput = createElement("input");
+      emailInput.type = "email";
+      emailInput.required = true;
+      emailInput.value = user.email;
+      emailInput.setAttribute("aria-label", `Email for user ${user.id}`);
+      emailCell.append(emailInput);
+
+      const passwordCell = createElement("td");
+      const passwordInput = createElement("input");
+      passwordInput.type = "password";
+      passwordInput.minLength = 12;
+      passwordInput.maxLength = 128;
+      passwordInput.autocomplete = "new-password";
+      passwordInput.placeholder = "Leave blank to keep current";
+      passwordInput.setAttribute("aria-label", `New password for ${user.email}`);
+      passwordCell.append(passwordInput);
+
+      const actionCell = createElement("td");
+      const saveButton = createElement("button", "Save changes");
+      saveButton.type = "button";
+      const rowStatus = createElement("span");
+      rowStatus.setAttribute("role", "status");
+      saveButton.addEventListener("click", async () => {
+        if (!emailInput.validity.valid) {
+          emailInput.reportValidity();
+          return;
+        }
+
+        saveButton.disabled = true;
+        rowStatus.textContent = "Saving…";
+        try {
+          const updated = await fetchJson<Pick<ManagedUser, "id" | "email">>(
+            `/api/users/${user.id}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: emailInput.value,
+                password: passwordInput.value,
+              }),
+            },
+          );
+          emailInput.value = updated.email;
+          passwordInput.value = "";
+          rowStatus.textContent = "Saved";
+        } catch (error) {
+          rowStatus.textContent = getErrorMessage(error);
+        } finally {
+          saveButton.disabled = false;
+        }
+      });
+      actionCell.append(saveButton, rowStatus);
+      row.append(idCell, emailCell, passwordCell, actionCell);
+      return row;
+    }),
+  );
+}
+
+async function loadUsers(): Promise<void> {
+  const users = await fetchJson<ManagedUser[]>("/api/users");
+  renderUsers(users);
+}
+
 function runBlacklistTask(task: () => Promise<void>): void {
   task().catch((error) => {
     if (blacklistStatus) {
@@ -482,6 +594,14 @@ function runBlacklistTask(task: () => Promise<void>): void {
         blacklistList,
         createElement("li", "Could not load excluded senders."),
       );
+    }
+  });
+}
+
+function runUsersTask(task: () => Promise<void>): void {
+  task().catch((error) => {
+    if (usersStatus) {
+      usersStatus.textContent = getErrorMessage(error);
     }
   });
 }
@@ -503,7 +623,111 @@ function stopLogPolling(): void {
   }
 }
 
+
+function renderAuthState(session: AuthSession): void {
+  const mustChangePassword = Boolean(
+    session.authenticated && session.mustChangePassword,
+  );
+  const showDashboard = session.authenticated && !mustChangePassword;
+  authGate?.classList.toggle("hidden", showDashboard);
+  dashboardContent?.classList.toggle("hidden", !showDashboard);
+  if (loginForm) {
+    loginForm.classList.toggle("hidden", session.authenticated);
+  }
+  if (passwordForm) {
+    passwordForm.classList.toggle("hidden", !mustChangePassword);
+  }
+  if (authStatus) {
+    authStatus.textContent = mustChangePassword
+      ? `Update the password for ${session.email ?? "your account"} to continue.`
+      : "";
+  }
+}
+
+function startDashboard(): void {
+  updateTabs();
+  initializeView();
+}
+
+loginForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(loginForm);
+  if (authStatus) {
+    authStatus.textContent = "Signing in…";
+  }
+
+  try {
+    const session = await fetchJson<AuthSession>("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: formData.get("email"),
+        password: formData.get("password"),
+      }),
+    });
+    renderAuthState(session);
+    if (!session.mustChangePassword) {
+      startDashboard();
+    }
+  } catch (error) {
+    if (authStatus) {
+      authStatus.textContent = getErrorMessage(error);
+    }
+  }
+});
+
+passwordForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(passwordForm);
+  if (authStatus) {
+    authStatus.textContent = "Updating password…";
+  }
+
+  try {
+    const response = await fetch("/api/auth/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: formData.get("password") }),
+    });
+    if (!response.ok) {
+      const payload = (await response.json()) as { error?: string };
+      throw new Error(payload.error ?? `Request failed (${response.status})`);
+    }
+
+    passwordForm.reset();
+    renderAuthState({ authenticated: true });
+    startDashboard();
+  } catch (error) {
+    if (authStatus) {
+      authStatus.textContent = getErrorMessage(error);
+    }
+  }
+});
+
+logoutButton?.addEventListener("click", async () => {
+  await fetch("/api/auth/logout", { method: "POST" });
+  stopLogPolling();
+  renderAuthState({ authenticated: false });
+});
+
+fetchJson<AuthSession>("/api/auth/session")
+  .then((session) => {
+    renderAuthState(session);
+    if (session.authenticated && !session.mustChangePassword) {
+      startDashboard();
+    }
+  })
+  .catch((error: unknown) => {
+    renderAuthState({ authenticated: false });
+    if (authStatus) {
+      authStatus.textContent = getErrorMessage(error);
+    }
+  });
 window.addEventListener("popstate", () => {
+  if (dashboardContent?.classList.contains("hidden")) {
+    return;
+  }
+
   updateTabs();
   initializeView();
 });
@@ -577,6 +801,11 @@ blacklistForm?.addEventListener("submit", async (event) => {
 });
 
 function initializeView(): void {
+  if (isUsersRoute()) {
+    runUsersTask(loadUsers);
+    return;
+  }
+
   runWarningTask(() => loadWarnings(false));
 
   if (isLogsRoute()) {
@@ -591,6 +820,3 @@ function initializeView(): void {
 
   runOverviewTask(loadMetrics);
 }
-
-updateTabs();
-initializeView();
