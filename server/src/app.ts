@@ -148,13 +148,10 @@ export function createApp(
   warningStore: WarningStore,
 ): express.Express {
   const app = express();
-  const openPixelLimiter = createRateLimiter(120, 60_000);
   const opensApiLimiter = createRateLimiter(240, 60_000);
-  const dashboardLimiter = createRateLimiter(240, 60_000);
-  const logLimiter = createRateLimiter(120, 60_000);
-  const warningLimiter = createRateLimiter(60, 60_000);
-  const blacklistLimiter = createRateLimiter(60, 60_000);
+  const rateLimiter = createRateLimiter(120, 60_000);
   const ingestLimiter = createRateLimiter(600, 60_000);
+
   const trackingBlacklist = new TrackingBlacklistStore(
     path.join(config.rspamdDir, "tracking-blacklist.txt"),
   );
@@ -179,7 +176,7 @@ export function createApp(
 
   app.get(
     "/open/:msgId.png",
-    openPixelLimiter,
+    rateLimiter,
     async (request: Request, response: Response, next) => {
       try {
         const msgId = getRouteParam(request.params.msgId);
@@ -287,7 +284,7 @@ export function createApp(
     },
   );
 
-  app.get("/api/logs", logLimiter, async (_request, response, next) => {
+  app.get("/api/logs", rateLimiter, async (_request, response, next) => {
     try {
       response.json(await listLogFiles(logRegistry));
     } catch (error) {
@@ -295,7 +292,7 @@ export function createApp(
     }
   });
 
-  app.get("/api/logs/:name", logLimiter, async (request, response, next) => {
+  app.get("/api/logs/:name", rateLimiter, async (request, response, next) => {
     try {
       const lines = Number(request.query.lines ?? 200);
       const logName = getRouteParam(request.params.name);
@@ -310,13 +307,13 @@ export function createApp(
     }
   });
 
-  app.get("/api/warnings", warningLimiter, (_request, response) => {
+  app.get("/api/warnings", rateLimiter, (_request, response) => {
     response.json(warningStore.getState());
   });
 
   app.post(
     "/api/warnings/recheck",
-    warningLimiter,
+    rateLimiter,
     async (_request, response, next) => {
       try {
         response.json(await warningStore.refresh());
@@ -328,7 +325,7 @@ export function createApp(
 
   app.get(
     "/api/tracking-blacklist",
-    blacklistLimiter,
+    rateLimiter,
     async (_request, response, next) => {
       try {
         response.json({ addresses: await trackingBlacklist.getAddresses() });
@@ -340,7 +337,7 @@ export function createApp(
 
   app.post(
     "/api/tracking-blacklist",
-    blacklistLimiter,
+    rateLimiter,
     async (request, response, next) => {
       try {
         response.json({
@@ -359,7 +356,7 @@ export function createApp(
 
   app.delete(
     "/api/tracking-blacklist/:address",
-    blacklistLimiter,
+    rateLimiter,
     async (request, response, next) => {
       try {
         const address = getRouteParam(request.params.address);
@@ -379,7 +376,7 @@ export function createApp(
 
   app.get(
     ["/dashboard", "/dashboard/*path"],
-    dashboardLimiter,
+    rateLimiter,
     (_request, response, next) => {
       response.sendFile(dashboardIndexFile, (error) => {
         if (error) {
