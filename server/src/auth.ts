@@ -56,7 +56,7 @@ export async function verifyPassword(
 }
 
 export async function ensureDefaultAdmin(database: Knex): Promise<void> {
-  const existing = await database("users").where({ email: defaultEmail }).first("id");
+  const existing = await database("users").first("id");
   if (existing) {
     return;
   }
@@ -66,6 +66,18 @@ export async function ensureDefaultAdmin(database: Knex): Promise<void> {
       email: defaultEmail,
       password_hash: await hashPassword(defaultPassword),
       must_change_password: true,
+    })
+    .onConflict("email")
+    .ignore();
+}
+
+// Dev only: account used by scripts/fake-mail.mjs, seeded when SEED_FAKE_USER=true.
+export async function ensureFakeUser(database: Knex): Promise<void> {
+  await database("users")
+    .insert({
+      email: "fake@dev.local",
+      password_hash: await hashPassword("fake-dev-password"),
+      must_change_password: false,
     })
     .onConflict("email")
     .ignore();

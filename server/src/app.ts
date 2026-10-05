@@ -186,6 +186,7 @@ export function createApp(
     config.publicDistRoot,
     dashboardIndexPath,
   );
+  const loginPageFile = path.join(config.publicDistRoot, "login.html");
   const trackingPixelFile = path.join(config.publicRoot, "images", "pixel.png");
 
   app.disable("x-powered-by");
@@ -196,6 +197,14 @@ export function createApp(
     "/dashboard",
     express.static(config.publicDistRoot, { index: false }),
   );
+
+  app.get("/login", (_request: Request, response: Response, next) => {
+    response.sendFile(loginPageFile, (error) => {
+      if (error) {
+        next(error);
+      }
+    });
+  });
 
   app.post("/api/auth/login", loginLimiter, async (request, response, next) => {
     try {
@@ -622,12 +631,24 @@ export function createApp(
   app.get(
     ["/dashboard", "/dashboard/*path"],
     rateLimiter,
-    (_request, response, next) => {
-      response.sendFile(dashboardIndexFile, (error) => {
-        if (error) {
-          next(error);
+    async (request, response, next) => {
+      try {
+        const user = await getAuthenticatedUser(database, request);
+        if (!user || user.mustChangePassword) {
+          response.redirect(
+            `/login?returnTo=${encodeURIComponent(request.originalUrl)}`,
+          );
+          return;
         }
-      });
+
+        response.sendFile(dashboardIndexFile, (error) => {
+          if (error) {
+            next(error);
+          }
+        });
+      } catch (error) {
+        next(error);
+      }
     },
   );
 

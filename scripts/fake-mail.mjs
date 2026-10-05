@@ -100,7 +100,24 @@ for (let i = 0; i < messageCount; i += 1) {
   console.log(`message ${uid}`);
 }
 
-const summaries = await (await fetch(`${baseUrl}/api/opens`)).json();
+const loginResponse = await fetch(`${baseUrl}/api/auth/login`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    email: "fake@dev.local",
+    password: "fake-dev-password",
+  }),
+});
+if (!loginResponse.ok) {
+  throw new Error(
+    `Login as fake@dev.local failed: ${loginResponse.status} (is the server running with SEED_FAKE_USER=true?)`,
+  );
+}
+const cookie = loginResponse.headers.getSetCookie()[0].split(";")[0];
+
+const summaries = await (
+  await fetch(`${baseUrl}/api/opens`, { headers: { Cookie: cookie } })
+).json();
 // /api/opens only lists opened messages, so add this run's messages to the pool.
 const pool = [...new Set([...summaries.map((row) => row.msgId), ...created])];
 if (pool.length === 0) {

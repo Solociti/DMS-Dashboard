@@ -43,7 +43,18 @@ await build({
   target: ['es2020']
 });
 
+await build({
+  entryPoints: [path.join(rootDir, 'client', 'login.ts')],
+  bundle: true,
+  format: 'iife',
+  minify: true,
+  outfile: path.join(clientOutDir, 'assets', 'login.js'),
+  platform: 'browser',
+  target: ['es2020']
+});
+
 await cp(path.join(rootDir, 'client', 'index.html'), path.join(clientOutDir, 'index.html'));
+await cp(path.join(rootDir, 'client', 'login.html'), path.join(clientOutDir, 'login.html'));
 await cp(path.join(rootDir, 'client', 'styles.css'), path.join(clientOutDir, 'styles.css'));
 
 await run(path.join(rootDir, 'node_modules', '.bin', 'ncc'), [

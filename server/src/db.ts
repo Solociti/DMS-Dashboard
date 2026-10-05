@@ -7,7 +7,7 @@ import * as createOpensMigration from "../migrations/20260928100000_create_opens
 import * as createMessagesMigration from "../migrations/20261005100000_create_messages";
 import * as addSentAtToMessagesMigration from "../migrations/20261005110000_add_sent_at_to_messages";
 import * as createUsersAndSessionsMigration from "../migrations/20261005120000_create_users_and_sessions";
-import { ensureDefaultAdmin } from "./auth";
+import { ensureDefaultAdmin, ensureFakeUser } from "./auth";
 
 const migrations = [
   createOpensMigration,
@@ -66,4 +66,7 @@ export async function runMigrations(database: Knex): Promise<void> {
     tableName: "knex_migrations",
   });
   await ensureDefaultAdmin(database);
+  if (process.env.SEED_FAKE_USER === "true") {
+    await ensureFakeUser(database);
+  }
 }

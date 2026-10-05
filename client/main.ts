@@ -55,11 +55,7 @@ const addBlacklistAddressButton = document.querySelector<HTMLButtonElement>(
 const tabs = Array.from(
   document.querySelectorAll<HTMLAnchorElement>(".tabs a"),
 );
-const authGate = document.querySelector<HTMLElement>("#auth-gate");
 const dashboardContent = document.querySelector<HTMLElement>("#dashboard-content");
-const loginForm = document.querySelector<HTMLFormElement>("#login-form");
-const passwordForm = document.querySelector<HTMLFormElement>("#password-form");
-const authStatus = document.querySelector<HTMLParagraphElement>("#auth-status");
 const logoutButton = document.querySelector<HTMLButtonElement>("#logout-button");
 
 interface AuthSession {
@@ -624,105 +620,33 @@ function stopLogPolling(): void {
 }
 
 
-function renderAuthState(session: AuthSession): void {
-  const mustChangePassword = Boolean(
-    session.authenticated && session.mustChangePassword,
-  );
-  const showDashboard = session.authenticated && !mustChangePassword;
-  authGate?.classList.toggle("hidden", showDashboard);
-  dashboardContent?.classList.toggle("hidden", !showDashboard);
-  if (loginForm) {
-    loginForm.classList.toggle("hidden", session.authenticated);
-  }
-  if (passwordForm) {
-    passwordForm.classList.toggle("hidden", !mustChangePassword);
-  }
-  if (authStatus) {
-    authStatus.textContent = mustChangePassword
-      ? `Update the password for ${session.email ?? "your account"} to continue.`
-      : "";
-  }
-}
-
 function startDashboard(): void {
+  dashboardContent?.classList.remove("hidden");
   updateTabs();
   initializeView();
 }
 
-loginForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const formData = new FormData(loginForm);
-  if (authStatus) {
-    authStatus.textContent = "Signing in…";
-  }
-
-  try {
-    const session = await fetchJson<AuthSession>("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: formData.get("email"),
-        password: formData.get("password"),
-      }),
-    });
-    renderAuthState(session);
-    if (!session.mustChangePassword) {
-      startDashboard();
-    }
-  } catch (error) {
-    if (authStatus) {
-      authStatus.textContent = getErrorMessage(error);
-    }
-  }
-});
-
-passwordForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const formData = new FormData(passwordForm);
-  if (authStatus) {
-    authStatus.textContent = "Updating password…";
-  }
-
-  try {
-    const response = await fetch("/api/auth/password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: formData.get("password") }),
-    });
-    if (!response.ok) {
-      const payload = (await response.json()) as { error?: string };
-      throw new Error(payload.error ?? `Request failed (${response.status})`);
-    }
-
-    passwordForm.reset();
-    renderAuthState({ authenticated: true });
-    startDashboard();
-  } catch (error) {
-    if (authStatus) {
-      authStatus.textContent = getErrorMessage(error);
-    }
-  }
-});
+function redirectToLogin(): void {
+  const returnTo = `${window.location.pathname}${window.location.search}`;
+  window.location.replace(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+}
 
 logoutButton?.addEventListener("click", async () => {
   await fetch("/api/auth/logout", { method: "POST" });
   stopLogPolling();
-  renderAuthState({ authenticated: false });
+  redirectToLogin();
 });
 
 fetchJson<AuthSession>("/api/auth/session")
   .then((session) => {
-    renderAuthState(session);
-    if (session.authenticated && !session.mustChangePassword) {
-      startDashboard();
+    if (!session.authenticated || session.mustChangePassword) {
+      redirectToLogin();
+      return;
     }
+
+    startDashboard();
   })
-  .catch((error: unknown) => {
-    renderAuthState({ authenticated: false });
-    if (authStatus) {
-      authStatus.textContent = getErrorMessage(error);
-    }
-  });
+  .catch(() => redirectToLogin());
 window.addEventListener("popstate", () => {
   if (dashboardContent?.classList.contains("hidden")) {
     return;

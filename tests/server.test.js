@@ -6,8 +6,11 @@ const test = require("node:test");
 
 const {
   createServerApplication,
+  createDatabase,
+  ensureDatabaseDirectory,
   ensureTrackingFilter,
   loadConfig,
+  runMigrations,
 } = require("../build/server/index.js");
 
 async function makeTempDir() {
@@ -76,6 +79,36 @@ test("loadConfig accepts a custom Rspamd directory", () => {
   assert.equal(defaultConfig.rspamdDir, path.join("/mail", "rspamd"));
 });
 
+test("default admin is only seeded when there are no users", async () => {
+  const root = await makeTempDir();
+  const databasePath = path.join(root, "data", "tracker.sqlite");
+  await ensureDatabaseDirectory(databasePath);
+  const database = createDatabase(databasePath);
+
+  try {
+    await runMigrations(database);
+    await database("users")
+      .where({ email: "admin@example.com" })
+      .update({ email: "renamed-admin@example.com" });
+
+    await runMigrations(database);
+
+    assert.equal(
+      await database("users")
+        .count({ count: "*" })
+        .first()
+        .then((row) => Number(row.count)),
+      1,
+    );
+    assert.equal(
+      await database("users").where({ email: "admin@example.com" }).first(),
+      undefined,
+    );
+  } finally {
+    await database.destroy();
+  }
+});
+
 test("ensureTrackingFilter aborts when Rspamd directory is missing", async () => {
   const root = await makeTempDir();
   const source = path.join(root, "rspamd.local.lua");
@@ -101,7 +134,11 @@ test("ensureTrackingFilter replaces an existing filter when its contents differ"
   );
   await fs.writeFile(target, "-- existing lua");
 
-  const token = await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
+  const token = await ensureTrackingFilter(
+    rspamdDir,
+    source,
+    "https://tracker.example.com",
+  );
   assert.match(token, /^[0-9a-f]{64}$/);
   assert.equal(
     await fs.readFile(target, "utf8"),
@@ -124,7 +161,11 @@ test("ensureTrackingFilter leaves an identical filter unchanged", async () => {
   );
   await fs.writeFile(target, installed);
 
-  const token = await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
+  const token = await ensureTrackingFilter(
+    rspamdDir,
+    source,
+    "https://tracker.example.com",
+  );
   assert.equal(token, existingToken);
   assert.equal(await fs.readFile(target, "utf8"), installed);
 });
@@ -149,6 +190,10 @@ test("warning API reports missing tracking base URL and skips filter install", a
     path.join(publicDistDir, "index.html"),
     "<!doctype html><title>ok</title>",
   );
+  await fs.writeFile(
+    path.join(publicDistDir, "login.html"),
+    "<!doctype html><title>sign in</title>",
+  );
 
   const { app, database } = await createServerApplication({
     appRoot: root,
@@ -171,20 +216,41 @@ test("warning API reports missing tracking base URL and skips filter install", a
   try {
     const address = server.address();
     const baseUrl = `http://127.0.0.1:${address.port}`;
+    const dashboardResponse = await fetch(`${baseUrl}/dashboard/logs`, {
+      redirect: "manual",
+    });
+    assert.equal(dashboardResponse.status, 302);
+    assert.equal(
+      dashboardResponse.headers.get("location"),
+      "/login?returnTo=%2Fdashboard%2Flogs",
+    );
+    const loginPageResponse = await fetch(
+      `${baseUrl}${dashboardResponse.headers.get("location")}`,
+    );
+    assert.equal(loginPageResponse.status, 200);
+    assert.match(await loginPageResponse.text(), /<title>sign in<\/title>/);
+
     const anonymousResponse = await fetch(`${baseUrl}/api/warnings`);
     assert.equal(anonymousResponse.status, 401);
 
     const { cookie, session } = await signInAdmin(baseUrl);
     assert.equal(session.email, "admin@example.com");
     assert.equal(session.mustChangePassword, true);
-    const blockedResponse = await authFetch(
-      `${baseUrl}/api/warnings`,
-      cookie,
-    );
+    const blockedResponse = await authFetch(`${baseUrl}/api/warnings`, cookie);
     assert.equal(blockedResponse.status, 403);
     assert.equal(
       (await blockedResponse.json()).code,
       "password-change-required",
+    );
+    const passwordChangeRedirect = await authFetch(
+      `${baseUrl}/dashboard`,
+      cookie,
+      { redirect: "manual" },
+    );
+    assert.equal(passwordChangeRedirect.status, 302);
+    assert.equal(
+      passwordChangeRedirect.headers.get("location"),
+      "/login?returnTo=%2Fdashboard",
     );
 
     const unchangedPasswordResponse = await fetch(
@@ -209,6 +275,12 @@ test("warning API reports missing tracking base URL and skips filter install", a
       body: JSON.stringify({ password: "test-admin-password" }),
     });
     assert.equal(passwordResponse.status, 204);
+    const dashboardAfterReset = await authFetch(
+      `${baseUrl}/dashboard`,
+      cookie,
+      { redirect: "manual" },
+    );
+    assert.equal(dashboardAfterReset.status, 200);
 
     const hiddenUsersResponse = await fetch(`${baseUrl}/api/users`);
     assert.equal(hiddenUsersResponse.status, 401);
@@ -398,9 +470,9 @@ test("tracking blacklist API validates and persists sender addresses", async () 
       `${baseUrl}/api/tracking-blacklist`,
       cookie,
       {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ address: "newsletter@example.com" }),
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address: "newsletter@example.com" }),
       },
     );
     assert.deepEqual((await duplicate.json()).addresses, [
@@ -411,9 +483,9 @@ test("tracking blacklist API validates and persists sender addresses", async () 
       `${baseUrl}/api/tracking-blacklist`,
       cookie,
       {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ address: "not-an-email" }),
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address: "not-an-email" }),
       },
     );
     assert.equal(invalid.status, 400);
