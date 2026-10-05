@@ -4,8 +4,10 @@ services:
       context: .
       dockerfile: server/Dockerfile
       target: dev
-    # Set UID/GID in .env (or export them) so bind-mounted files aren't created as root.
-    user: "${UID:-1000}:${GID:-1000}"
+    init: true
+    # `pnpm run dev` pre-creates the bind-mount dirs and sets DEV_UID/DEV_GID to the host user;
+    # without it Compose would create them as root and SQLite could not write /data.
+    user: "${DEV_UID:-1000}:${DEV_GID:-1000}"
     env_file:
       - example.env
     environment:

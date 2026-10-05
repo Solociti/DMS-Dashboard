@@ -49,6 +49,15 @@ export async function startServer(config: AppConfig = loadConfig()): Promise<{
     const server = app.listen(config.port, () => {
       server.off("error", rejectWithCleanup);
       console.log(`DMS Dashboard listening on ${config.port}`);
+      const shutdown = (signal: string) => {
+        console.log(`${signal} received, shutting down`);
+        server.close(() => {
+          void database.destroy().finally(() => process.exit(0));
+        });
+        server.closeAllConnections();
+      };
+      process.once('SIGTERM', () => shutdown('SIGTERM'));
+      process.once('SIGINT', () => shutdown('SIGINT'));
       resolve({ server, database });
     });
 
