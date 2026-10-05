@@ -1,4 +1,5 @@
 import express, { type Request, type Response } from "express";
+import crypto from "node:crypto";
 import path from "node:path";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import type { Knex } from "knex";
@@ -26,6 +27,43 @@ interface RawSummaryRow {
   msg_id: string;
   total_opens: number | string;
   last_opened: string | null;
+  subject: string | null;
+  sender: string | null;
+  recipients: string | null;
+}
+
+function optionalString(value: unknown, maxLength: number): string | null {
+  return typeof value === "string" && value.length > 0
+    ? value.slice(0, maxLength)
+    : null;
+}
+
+function isAuthorized(request: Request, token: string | null): boolean {
+  if (!token) {
+    return false;
+  }
+
+  const expected = crypto.createHash("sha256").update(token).digest();
+  const provided = crypto
+    .createHash("sha256")
+    .update(request.header("authorization")?.replace(/^Bearer /i, "") ?? "")
+    .digest();
+  return crypto.timingSafeEqual(expected, provided);
+}
+
+function parseRecipients(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 function getRouteParam(value: string | string[] | undefined): string | null {
@@ -60,16 +98,30 @@ function createRateLimiter(
 
 async function getOpenSummaries(database: Knex): Promise<OpenSummary[]> {
   const rows = (await database<RawSummaryRow>("opens")
-    .select("msg_id")
+    .leftJoin("messages", "messages.uid", "opens.msg_id")
+    .select(
+      "opens.msg_id as msg_id",
+      "messages.subject as subject",
+      "messages.sender as sender",
+      "messages.recipients as recipients",
+    )
     .count<{ total_opens: number | string }>({ total_opens: "*" })
-    .max({ last_opened: "created_at" })
-    .groupBy("msg_id")
+    .max({ last_opened: "opens.created_at" })
+    .groupBy(
+      "opens.msg_id",
+      "messages.subject",
+      "messages.sender",
+      "messages.recipients",
+    )
     .orderBy("last_opened", "desc")) as unknown as RawSummaryRow[];
 
   return rows.map((row) => ({
     msgId: row.msg_id,
     totalOpens: Number(row.total_opens),
     lastOpened: row.last_opened,
+    subject: row.subject,
+    sender: row.sender,
+    recipients: parseRecipients(row.recipients),
   }));
 }
 
@@ -102,6 +154,7 @@ export function createApp(
   const logLimiter = createRateLimiter(120, 60_000);
   const warningLimiter = createRateLimiter(60, 60_000);
   const blacklistLimiter = createRateLimiter(60, 60_000);
+  const ingestLimiter = createRateLimiter(600, 60_000);
   const trackingBlacklist = new TrackingBlacklistStore(
     path.join(config.rspamdDir, "tracking-blacklist.txt"),
   );
@@ -159,6 +212,49 @@ export function createApp(
           .catch((error: unknown) => {
             console.error(error instanceof Error ? error.message : error);
           });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    "/api/messages",
+    ingestLimiter,
+    async (request: Request, response: Response, next) => {
+      try {
+        if (!isAuthorized(request, config.trackingApiToken)) {
+          response.status(401).json({ error: "Unauthorized" });
+          return;
+        }
+
+        const body = request.body ?? {};
+        const uid = optionalString(body.uid, 128);
+        if (!uid) {
+          response.status(400).json({ error: "Missing uid" });
+          return;
+        }
+
+        const recipients = Array.isArray(body.recipients)
+          ? body.recipients
+              .map((item: unknown) => optionalString(item, 320))
+              .filter((item: string | null): item is string => item !== null)
+              .slice(0, 100)
+          : [];
+
+        await database("messages")
+          .insert({
+            uid,
+            message_id: optionalString(body.message_id, 998),
+            subject: optionalString(body.subject, 998),
+            sender: optionalString(body.sender, 320),
+            recipients: JSON.stringify(recipients),
+            user: optionalString(body.user, 320),
+          })
+          .onConflict("uid")
+          .merge();
+
+        response.status(204).end();
       } catch (error) {
         next(error);
       }

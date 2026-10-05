@@ -188,6 +188,21 @@ async function loadWarnings(recheck = false): Promise<void> {
   renderWarnings(state);
 }
 
+function createMessageCell(row: OpenSummary): HTMLTableCellElement {
+  const cell = createElement('td');
+  if (!row.subject && !row.sender && row.recipients.length === 0) {
+    cell.textContent = row.msgId;
+    return cell;
+  }
+
+  cell.append(createElement('strong', row.subject ?? '(no subject)'));
+  cell.append(document.createElement('br'));
+  cell.append(createElement('span', `From: ${row.sender ?? 'Unknown'}`));
+  cell.append(document.createElement('br'));
+  cell.append(createElement('span', `To: ${row.recipients.join(', ') || 'Unknown'}`));
+  return cell;
+}
+
 async function loadMetrics(): Promise<void> {
   if (!trackedCount || !totalOpens || !lastOpened || !messageTableBody) {
     return;
@@ -219,7 +234,7 @@ async function loadMetrics(): Promise<void> {
       const tableRow = createElement('tr');
       tableRow.dataset.msgId = row.msgId;
       tableRow.append(
-        createElement('td', row.msgId),
+        createMessageCell(row),
         createElement('td', String(row.totalOpens)),
         createElement('td', formatDate(row.lastOpened))
       );

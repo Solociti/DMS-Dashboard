@@ -4,18 +4,20 @@ import knex, { type Knex } from 'knex';
 import 'sqlite3';
 import * as createOpensMigration from '../migrations/20260928100000_create_opens';
 
-const migrations = [createOpensMigration];
+import * as createMessagesMigration from '../migrations/20261005100000_create_messages';
+
+const migrations = [createOpensMigration, createMessagesMigration];
 
 class InlineMigrationSource {
   async getMigrations(): Promise<typeof migrations> {
     return migrations;
   }
 
-  getMigrationName(migration: typeof createOpensMigration): string {
+  getMigrationName(migration: (typeof migrations)[number]): string {
     return migration.name;
   }
 
-  async getMigration(migration: typeof createOpensMigration): Promise<typeof createOpensMigration> {
+  async getMigration(migration: (typeof migrations)[number]): Promise<(typeof migrations)[number]> {
     return migration;
   }
 }

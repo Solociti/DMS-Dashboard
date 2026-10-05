@@ -61,14 +61,15 @@ test("ensureTrackingFilter replaces an existing filter when its contents differ"
   await fs.mkdir(rspamdDir, { recursive: true });
   await fs.writeFile(
     source,
-    'local tracking_base_url = "__TRACKING_BASE_URL__"',
+    'local tracking_base_url = "__TRACKING_BASE_URL__"\nlocal TRACKING_API_TOKEN = "__TRACKING_API_TOKEN__"',
   );
   await fs.writeFile(target, "-- existing lua");
 
-  await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
+  const token = await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
+  assert.match(token, /^[0-9a-f]{64}$/);
   assert.equal(
     await fs.readFile(target, "utf8"),
-    'local tracking_base_url = "https://tracker.example.com"',
+    `local tracking_base_url = "https://tracker.example.com"\nlocal TRACKING_API_TOKEN = "${token}"`,
   );
 });
 
@@ -79,20 +80,17 @@ test("ensureTrackingFilter leaves an identical filter unchanged", async () => {
   const target = path.join(rspamdDir, "rspamd.local.lua");
 
   await fs.mkdir(rspamdDir, { recursive: true });
+  const existingToken = "a".repeat(64);
+  const installed = `local tracking_base_url = "https://tracker.example.com"\nlocal TRACKING_API_TOKEN = "${existingToken}"`;
   await fs.writeFile(
     source,
-    'local tracking_base_url = "__TRACKING_BASE_URL__"',
+    'local tracking_base_url = "__TRACKING_BASE_URL__"\nlocal TRACKING_API_TOKEN = "__TRACKING_API_TOKEN__"',
   );
-  await fs.writeFile(
-    target,
-    'local tracking_base_url = "https://tracker.example.com"',
-  );
+  await fs.writeFile(target, installed);
 
-  await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
-  assert.equal(
-    await fs.readFile(target, "utf8"),
-    'local tracking_base_url = "https://tracker.example.com"',
-  );
+  const token = await ensureTrackingFilter(rspamdDir, source, "https://tracker.example.com");
+  assert.equal(token, existingToken);
+  assert.equal(await fs.readFile(target, "utf8"), installed);
 });
 
 test("warning API reports missing tracking base URL and skips filter install", async () => {
@@ -160,7 +158,10 @@ test("warning recheck clears missing directory warning and installs the filter",
   const target = path.join(rspamdDir, "rspamd.local.lua");
 
   await fs.mkdir(publicDistDir, { recursive: true });
-  await fs.writeFile(luaSource, "-- lua");
+  await fs.writeFile(
+    luaSource,
+    'local tracking_base_url = "__TRACKING_BASE_URL__"\nlocal TRACKING_API_TOKEN = "__TRACKING_API_TOKEN__"',
+  );
   await fs.writeFile(
     path.join(publicDistDir, "index.html"),
     "<!doctype html><title>ok</title>",
@@ -196,9 +197,9 @@ test("warning recheck clears missing directory warning and installs the filter",
       await fetch(`${baseUrl}/api/warnings/recheck`, { method: "POST" })
     ).json();
     assert.equal(refreshedState.warnings.length, 0);
-    assert.equal(
+    assert.match(
       await fs.readFile(target, "utf8"),
-      'local tracking_base_url = "https://tracker.example.com"',
+      /^local tracking_base_url = "https:\/\/tracker\.example\.com"\nlocal TRACKING_API_TOKEN = "[0-9a-f]{64}"$/,
     );
   } finally {
     await new Promise((resolve, reject) =>
