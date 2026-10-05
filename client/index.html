@@ -23,6 +23,7 @@
       <nav class="tabs" aria-label="Views">
         <a href="/dashboard" data-tab="overview">Overview</a>
         <a href="/dashboard/logs" data-tab="logs">Logs</a>
+        <a href="/dashboard/blacklist" data-tab="blacklist">Excluded senders</a>
       </nav>
 
       <section id="warning-panel" class="panel warning-panel hidden">
@@ -120,6 +121,35 @@ Select a log to view its contents.</pre
               >
             </section>
           </div>
+        </section>
+
+        <section id="blacklist-view" class="panel stack hidden">
+          <div class="panel-heading">
+            <div>
+              <h2>Excluded senders</h2>
+              <p id="blacklist-count" class="muted">Loading addresses…</p>
+            </div>
+          </div>
+
+          <form id="blacklist-form" class="blacklist-form">
+            <label for="blacklist-address">Sender email address</label>
+            <div class="blacklist-input-row">
+              <input
+                id="blacklist-address"
+                name="address"
+                type="email"
+                autocomplete="email"
+                placeholder="name@example.com"
+                required
+              />
+              <button id="add-blacklist-address" type="submit">Exclude sender</button>
+            </div>
+          </form>
+
+          <p id="blacklist-status" class="muted" role="status" aria-live="polite"></p>
+          <ul id="blacklist-list" class="blacklist-list">
+            <li>Loading…</li>
+          </ul>
         </section>
       </main>
     </div>

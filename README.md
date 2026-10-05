@@ -22,6 +22,7 @@ Copy `example.env` and adjust values as needed:
 - `RSPAMD_DIR`: Rspamd directory where the dashboard writes `rspamd.local.lua` (default `${DMS_ROOT}/rspamd`)
 - `TRUST_PROXY`: set to `true`, a hop count, or a proxy definition only when the app sits behind your own trusted proxy
 - `TRACKING_BASE_URL`: externally reachable dashboard origin used by the Lua filter; when unset, the filter is not installed and the dashboard shows a warning
+- The dashboard stores excluded sender addresses in `tracking-blacklist.txt` beside the generated Rspamd filter.
 - `LOG_FILES`: comma-separated log aliases and paths, for example `rspamd:/dms/logs/rspamd.log,mail:/dms/logs/mail.log`
 
 For tracking mail sent through authenticated SMTP accounts, Docker Mailserver must run Rspamd checks for authenticated users. Set `RSPAMD_CHECK_AUTHENTICATED=1` on the Docker Mailserver container; its default is `0`, which skips those messages and prevents the tracking postfilter from running. This enables the default Rspamd checks for authenticated mail, not only the tracking filter. The tracking filter only modifies messages with an authenticated user, so ordinary inbound mail is not changed.
@@ -60,7 +61,10 @@ DMS's normal config volume handles `rspamd/override.d`, but a custom `rspamd.loc
 volumes:
   - ./docker-data/dms/config/:/tmp/docker-mailserver/
   - ./docker-data/dms/config/rspamd/rspamd.local.lua:/etc/rspamd/rspamd.local.lua:ro
+  - ./docker-data/dms/config/rspamd/tracking-blacklist.txt:/etc/rspamd/tracking-blacklist.txt:ro
 ```
+
+The dashboard creates the blacklist file when it installs the filter. The Lua filter reads it for each authenticated outbound message, so changes made on the Excluded senders page take effect without restarting Rspamd.
 
 ## Development
 

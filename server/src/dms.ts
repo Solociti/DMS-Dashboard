@@ -27,6 +27,19 @@ export async function ensureTrackingFilter(
     throw new Error(`${rspamdDirectory} is not a directory`);
   }
 
+  const blacklistPath = path.join(rspamdDirectory, "tracking-blacklist.txt");
+  try {
+    await fs.writeFile(blacklistPath, "", { flag: "wx" });
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !("code" in error) ||
+      error.code !== "EEXIST"
+    ) {
+      throw error;
+    }
+  }
+
   const targetPath = path.join(rspamdDirectory, "rspamd.local.lua");
   const sourceTemplate = await fs.readFile(trackingLuaSourcePath, "utf8");
   const placeholder = '"__TRACKING_BASE_URL__"';

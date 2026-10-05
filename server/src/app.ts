@@ -6,6 +6,10 @@ import type { Knex } from "knex";
 import type { OpenLogEntry, OpenSummary } from "../../common/types";
 import type { AppConfig } from "./config";
 import { listLogFiles, readLogFile, type LogRegistry } from "./logs";
+import {
+  InvalidBlacklistAddressError,
+  TrackingBlacklistStore,
+} from "./tracking-blacklist";
 import { WarningStore } from "./warnings";
 
 const dashboardIndexPath = "index.html";
@@ -97,6 +101,10 @@ export function createApp(
   const dashboardLimiter = createRateLimiter(240, 60_000);
   const logLimiter = createRateLimiter(120, 60_000);
   const warningLimiter = createRateLimiter(60, 60_000);
+  const blacklistLimiter = createRateLimiter(60, 60_000);
+  const trackingBlacklist = new TrackingBlacklistStore(
+    path.join(config.rspamdDir, "tracking-blacklist.txt"),
+  );
   const dashboardIndexFile = path.join(
     config.publicDistRoot,
     dashboardIndexPath,
@@ -217,6 +225,57 @@ export function createApp(
       try {
         response.json(await warningStore.refresh());
       } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.get(
+    "/api/tracking-blacklist",
+    blacklistLimiter,
+    async (_request, response, next) => {
+      try {
+        response.json({ addresses: await trackingBlacklist.getAddresses() });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  app.post(
+    "/api/tracking-blacklist",
+    blacklistLimiter,
+    async (request, response, next) => {
+      try {
+        response.json({
+          addresses: await trackingBlacklist.addAddress(request.body?.address),
+        });
+      } catch (error) {
+        if (error instanceof InvalidBlacklistAddressError) {
+          response.status(400).json({ error: error.message });
+          return;
+        }
+
+        next(error);
+      }
+    },
+  );
+
+  app.delete(
+    "/api/tracking-blacklist/:address",
+    blacklistLimiter,
+    async (request, response, next) => {
+      try {
+        const address = getRouteParam(request.params.address);
+        response.json({
+          addresses: await trackingBlacklist.removeAddress(address),
+        });
+      } catch (error) {
+        if (error instanceof InvalidBlacklistAddressError) {
+          response.status(400).json({ error: error.message });
+          return;
+        }
+
         next(error);
       }
     },

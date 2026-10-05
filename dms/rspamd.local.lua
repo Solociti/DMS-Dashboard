@@ -2,6 +2,25 @@ local lua_mime = require "lua_mime"
 local rspamd_logger = require "rspamd_logger"
 
 local TRACKING_DOMAIN = "__TRACKING_BASE_URL__"
+local TRACKING_BLACKLIST_PATH = "/etc/rspamd/tracking-blacklist.txt"
+
+local function is_blacklisted_sender(address)
+    local blacklist = io.open(TRACKING_BLACKLIST_PATH, "r")
+
+    if not blacklist then
+        return false
+    end
+
+    for blacklisted_sender in blacklist:lines() do
+        if address:lower() == blacklisted_sender:lower() then
+            blacklist:close()
+            return true
+        end
+    end
+
+    blacklist:close()
+    return false
+end
 
 local function newline(task)
     local t = task:get_newlines_type()
@@ -20,6 +39,18 @@ local function inject_tracking_pixel(task)
 
     -- Only modify authenticated outbound mail.
     if not user then
+        return
+    end
+
+    local sender = task:get_from("mime")
+    local sender_address = sender and sender.addr
+
+    if sender_address and is_blacklisted_sender(sender_address) then
+        rspamd_logger.infox(
+            task,
+            "TRACKING_PIXEL: skipping blacklisted sender %s",
+            sender_address
+        )
         return
     end
 

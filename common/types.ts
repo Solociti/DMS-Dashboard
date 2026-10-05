@@ -35,3 +35,7 @@ export interface WarningState {
   warnings: DashboardWarning[];
   checkedAt: string | null;
 }
+
+export interface TrackingBlacklistResponse {
+  addresses: string[];
+}
