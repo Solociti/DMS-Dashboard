@@ -4,9 +4,12 @@ services:
       context: .
       dockerfile: server/Dockerfile
       target: dev
+    # Set UID/GID in .env (or export them) so bind-mounted files aren't created as root.
+    user: "${UID:-1000}:${GID:-1000}"
     env_file:
       - example.env
     environment:
+      - HOME=/tmp
       - DATABASE_PATH=/data/tracker.sqlite
       - SEED_FAKE_USER=true
       - TRACKING_BASE_URL=localhost:3000
