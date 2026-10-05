@@ -1,20 +1,22 @@
 import express, { type Request, type Response } from "express";
-import crypto from "node:crypto";
-import path from "node:path";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import type { Knex } from "knex";
+import crypto from "node:crypto";
+import path from "node:path";
 
 import type { OpenLogEntry, OpenSummary } from "../../common/types";
-import type { AppConfig } from "./config";
 import {
+  canManageUsers,
   clearSessionCookie,
   createSession,
   destroySession,
+  destroyUserSessions,
   getAuthenticatedUser,
   hashPassword,
   setSessionCookie,
   verifyPassword,
 } from "./auth";
+import type { AppConfig } from "./config";
 import { listLogFiles, readLogFile, type LogRegistry } from "./logs";
 import {
   InvalidBlacklistAddressError,
@@ -306,6 +308,7 @@ export function createApp(
           password_hash: await hashPassword(password),
           must_change_password: false,
         });
+      await destroyUserSessions(database, user.id, request);
       response.status(204).end();
     } catch (error) {
       next(error);
@@ -423,8 +426,14 @@ export function createApp(
     }
   });
 
-  app.get("/api/users", rateLimiter, async (_request, response, next) => {
+  app.get("/api/users", rateLimiter, async (request, response, next) => {
     try {
+      const currentUser = await getAuthenticatedUser(database, request);
+      if (!currentUser || !canManageUsers(currentUser)) {
+        response.status(403).json({ error: "Administrator access required" });
+        return;
+      }
+
       const users = await database("users")
         .select("id", "email", "created_at")
         .orderBy("email", "asc");
@@ -445,6 +454,12 @@ export function createApp(
     rateLimiter,
     async (request, response, next) => {
       try {
+        const currentUser = await getAuthenticatedUser(database, request);
+        if (!currentUser || !canManageUsers(currentUser)) {
+          response.status(403).json({ error: "Administrator access required" });
+          return;
+        }
+
         const userId = Number(getRouteParam(request.params.userId));
         if (!Number.isSafeInteger(userId) || userId < 1) {
           response.status(400).json({ error: "Invalid user id" });
@@ -493,10 +508,18 @@ export function createApp(
         } = { email };
         if (typeof password === "string" && password.length > 0) {
           updates.password_hash = await hashPassword(password);
-          updates.must_change_password = false;
+          // Admin-set passwords for other users must be changed at next login.
+          updates.must_change_password = userId !== currentUser.id;
         }
 
         await database("users").where({ id: userId }).update(updates);
+        if (updates.password_hash) {
+          await destroyUserSessions(
+            database,
+            userId,
+            userId === currentUser.id ? request : undefined,
+          );
+        }
         response.json({ id: userId, email });
       } catch (error) {
         if (

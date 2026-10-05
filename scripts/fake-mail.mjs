@@ -59,7 +59,7 @@ async function appendLogs(messageId, subject, sender, recipients) {
   const stamp = new Date().toISOString();
   const queueId = crypto.randomBytes(5).toString("hex").toUpperCase();
   const score = (Math.random() * 6 - 1).toFixed(2);
-  const action = score > 5 ? "add header" : "no action";
+  const action = score > 4 ? "add header" : "no action";
   const mail = [
     `${stamp} mail postfix/smtpd[${100 + Math.floor(Math.random() * 900)}]: ${queueId}: client=unknown[10.0.0.${1 + Math.floor(Math.random() * 254)}]`,
     `${stamp} mail postfix/cleanup[${100 + Math.floor(Math.random() * 900)}]: ${queueId}: message-id=${messageId}`,
@@ -81,7 +81,10 @@ async function appendLogs(messageId, subject, sender, recipients) {
 
 async function createMessage(token) {
   const uid = crypto.randomBytes(3).toString("hex");
-  const recipients = Array.from({ length: 1 + Math.floor(Math.random() * 3) }, address);
+  const recipients = Array.from(
+    { length: 1 + Math.floor(Math.random() * 3) },
+    address,
+  );
   const messageId = `<${crypto.randomUUID()}@${pick(domains)}>`;
   const subject = `${pick(subjects)} ${Math.floor(Math.random() * 100)}`;
   const sender = address();
@@ -112,9 +115,12 @@ async function createMessage(token) {
 }
 
 async function openPixel(uid) {
-  const response = await fetch(`${baseUrl}/open/${encodeURIComponent(uid)}.png`, {
-    headers: { "User-Agent": pick(agents) },
-  });
+  const response = await fetch(
+    `${baseUrl}/open/${encodeURIComponent(uid)}.png`,
+    {
+      headers: { "User-Agent": pick(agents) },
+    },
+  );
   if (!response.ok) {
     throw new Error(`GET /open/${uid}.png failed: ${response.status}`);
   }

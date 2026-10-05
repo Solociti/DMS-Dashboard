@@ -1,6 +1,6 @@
-import crypto, { scrypt as callbackScrypt, randomBytes } from "node:crypto";
 import type { Request, Response } from "express";
 import type { Knex } from "knex";
+import crypto, { scrypt as callbackScrypt, randomBytes } from "node:crypto";
 
 const sessionCookieName = "dms_dashboard_session";
 const sessionLifetimeMs = 12 * 60 * 60 * 1000;
@@ -103,14 +103,18 @@ export async function getAuthenticatedUser(
 
   const row = (await database("sessions")
     .innerJoin("users", "users.id", "sessions.user_id")
-    .where({ token_hash: crypto.createHash("sha256").update(token).digest("hex") })
+    .where({
+      token_hash: crypto.createHash("sha256").update(token).digest("hex"),
+    })
     .where("sessions.expires_at", ">", new Date().toISOString())
     .select(
       "users.id as id",
       "users.email as email",
       "users.must_change_password as must_change_password",
     )
-    .first()) as Pick<StoredUser, "id" | "email" | "must_change_password"> | undefined;
+    .first()) as
+    | Pick<StoredUser, "id" | "email" | "must_change_password">
+    | undefined;
 
   return row
     ? {
@@ -119,6 +123,33 @@ export async function getAuthenticatedUser(
         mustChangePassword: Boolean(row.must_change_password),
       }
     : null;
+}
+
+export async function deleteExpiredSessions(database: Knex): Promise<void> {
+  await database("sessions")
+    .where("expires_at", "<=", new Date().toISOString())
+    .delete();
+}
+
+// Revokes a user's sessions, optionally keeping the request's own session.
+export async function destroyUserSessions(
+  database: Knex,
+  userId: number,
+  keepRequest?: Request,
+): Promise<void> {
+  const keepToken = keepRequest ? parseSessionToken(keepRequest) : null;
+  const query = database("sessions").where({ user_id: userId });
+  if (keepToken) {
+    query.whereNot({
+      token_hash: crypto.createHash("sha256").update(keepToken).digest("hex"),
+    });
+  }
+  await query.delete();
+}
+
+// All users are currently administrators.
+export function canManageUsers(_user: AuthenticatedUser): boolean {
+  return true;
 }
 
 export async function createSession(
@@ -141,12 +172,18 @@ export async function destroySession(
   const token = parseSessionToken(request);
   if (token) {
     await database("sessions")
-      .where({ token_hash: crypto.createHash("sha256").update(token).digest("hex") })
+      .where({
+        token_hash: crypto.createHash("sha256").update(token).digest("hex"),
+      })
       .delete();
   }
 }
 
-export function setSessionCookie(response: Response, token: string, secure: boolean): void {
+export function setSessionCookie(
+  response: Response,
+  token: string,
+  secure: boolean,
+): void {
   response.setHeader(
     "Set-Cookie",
     `${sessionCookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${sessionLifetimeMs / 1000}${secure ? "; Secure" : ""}`,
