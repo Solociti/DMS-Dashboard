@@ -1,6 +1,13 @@
+import type { DailyStat } from "../../common/types";
 import { formatDate } from "../shared/formatDate";
+import LineChart from "./LineChart";
 
 interface StatCardsProps {
+  /**
+   * Per-day counts for the last 90 days, oldest first.
+   */
+  daily: DailyStat[];
+
   /**
    * Messages matching the current filters, across all pages.
    */
@@ -23,6 +30,7 @@ interface StatCardsProps {
  * @param {StatCardsProps} arg0 [!important, totals cover all pages]
  */
 export default function StatCards({
+  daily,
   totalMessages,
   totalOpens,
   lastActivity,
@@ -30,11 +38,25 @@ export default function StatCards({
   return (
     <div className="stats-grid">
       <article className="stat-card">
+        <div className="line-chart-container line-chart-messages">
+          <LineChart
+            values={daily.map((day) => day.messages)}
+            label="Tracked messages per day, last 90 days"
+          />
+        </div>
+
         <h2>Tracked messages</h2>
         <p>{totalMessages}</p>
       </article>
 
-      <article className="stat-card">
+      <article className="stat-card stat-card-opens">
+        <div className="line-chart-container line-chart-opens">
+          <LineChart
+            values={daily.map((day) => day.opens)}
+            label="Opens per day, last 90 days"
+          />
+        </div>
+
         <h2>Total opens</h2>
         <p>{totalOpens}</p>
       </article>

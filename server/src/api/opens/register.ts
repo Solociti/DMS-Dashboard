@@ -1,7 +1,7 @@
 import type { RequestHandler, Router } from "express";
 import type { Knex } from "knex";
 
-import { getOpenEvents, getOpenSummaries } from "./handlers";
+import { getDailyStats, getOpenEvents, getOpenSummaries } from "./handlers";
 import { getOpenRouteParam, parseOpenFilters } from "./helpers";
 import { getAuthenticatedUser } from "../../auth";
 
@@ -20,6 +20,14 @@ export default function registerOpens(
           user?.email ?? null,
         ),
       );
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/daily", rateLimiter, async (_request, response, next) => {
+    try {
+      response.json(await getDailyStats(database));
     } catch (error) {
       next(error);
     }

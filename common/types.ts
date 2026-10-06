@@ -18,6 +18,13 @@ export interface OpenSummaryPage {
   pageSize: number;
 }
 
+export interface DailyStat {
+  /** UTC day, YYYY-MM-DD. */
+  date: string;
+  messages: number;
+  opens: number;
+}
+
 export interface OpenLogEntry {
   id: number;
   msgId: string;

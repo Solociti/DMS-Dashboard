@@ -168,6 +168,30 @@ button:hover {
   font-size: 1.8rem;
   margin: 0.4rem 0 0;
 }
+
+.line-chart-container {
+  position: relative;
+  top: 5px;
+  width: 100%;
+  height: 0px;
+}
+.line-chart-messages {
+  /* background: linear-gradient(135deg, #7c3aed, #ec4899 70%, #f97316); */
+  color: #ec4899;
+}
+.line-chart-opens {
+  /* background: linear-gradient(135deg, #06b6d4, #3b82f6 55%, #22c55e); */
+  color: #3b82f6;
+}
+
+.line-chart {
+  display: block;
+  width: 100%;
+  height: 70px;
+  margin-top: 0.75rem;
+  overflow: visible;
+}
+
 .panel-heading {
   display: flex;
   justify-content: space-between;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import type { OpenSummaryPage } from "../../common/types";
+import type { DailyStat, OpenSummaryPage } from "../../common/types";
 import { fetchJson } from "../shared/fetchJson";
 import { getErrorMessage } from "../shared/getErrorMessage";
 import MessageDetails from "./MessageDetails";
@@ -19,6 +19,13 @@ export default function OverviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [filters, setFilters] = useState(() => getMessageFilters());
+  const [daily, setDaily] = useState<DailyStat[]>([]);
+
+  useEffect(() => {
+    fetchJson<DailyStat[]>("/api/opens/daily")
+      .then(setDaily)
+      .catch(() => setDaily([]));
+  }, []);
 
   const handleFiltersChange = (next: MessageFilterValues) => {
     setFilters(next);
@@ -64,6 +71,7 @@ export default function OverviewPage() {
   return (
     <section className="stack">
       <StatCards
+        daily={daily}
         totalMessages={result?.total ?? 0}
         totalOpens={result?.totalOpens ?? 0}
         lastActivity={result?.items[0]?.lastOpened ?? null}

@@ -134,9 +134,9 @@ export default function MessageTable({
                     ...filters,
                     sort: "sent",
                     direction:
-                      filters.sort === "sent" && filters.direction === "asc"
-                        ? "desc"
-                        : "asc",
+                      filters.sort === "sent" && filters.direction === "desc"
+                        ? "asc"
+                        : "desc",
                   });
                 }}
               >
@@ -155,9 +155,9 @@ export default function MessageTable({
                     ...filters,
                     sort: "opened",
                     direction:
-                      filters.sort === "opened" && filters.direction === "asc"
-                        ? "desc"
-                        : "asc",
+                      filters.sort === "opened" && filters.direction === "desc"
+                        ? "asc"
+                        : "desc",
                   });
                 }}
               >
