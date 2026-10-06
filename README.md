@@ -32,7 +32,7 @@ When the database has no users, the dashboard creates a temporary admin account 
 - Email: `admin@example.com`
 - Temporary password: `changeme123`
 
-The first login requires setting a new password. Passwords must be 12 to 128 characters. All users are administrators: the Users view changes the email or password of any listed account, and leaving the new-password field blank keeps the current password. A password set for another user must be changed by that user at their next login. Changing a password signs out that user's other sessions, and expired sessions are deleted from the database on startup and at each login.
+The first login requires setting a new password. Passwords must be 12 to 128 characters. All users are administrators: the Users view changes the email or password of any listed account, and leaving the new-password field blank keeps the current password. A password set for another user must be changed by that user at their next login. Changing a password signs out that user's other sessions.
 
 For tracking mail sent through authenticated SMTP accounts, Docker Mailserver must run Rspamd checks for authenticated users. Set `RSPAMD_CHECK_AUTHENTICATED=1` on the Docker Mailserver container; its default is `0`, which skips those messages and prevents the tracking postfilter from running. This enables the default Rspamd checks for authenticated mail, not only the tracking filter. The tracking filter only modifies messages with an authenticated user, so ordinary inbound mail is not changed.
 
