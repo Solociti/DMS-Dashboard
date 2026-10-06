@@ -26,7 +26,11 @@ export async function createServerApplication(
   const database = createDatabase(config.databasePath);
   await runMigrations(database);
 
-  setInterval(() => deleteExpiredSessions(database), 5 * 60 * 60 * 1000);
+  const sessionCleanupTimer = setInterval(
+    () => deleteExpiredSessions(database),
+    5 * 60 * 60 * 1000,
+  );
+  sessionCleanupTimer.unref();
 
   const warningStore = new WarningStore(config);
   await warningStore.refresh();

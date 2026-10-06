@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
 
-import type { OpenLogEntry, OpenSummary } from "../../../common/types";
+import type { OpenLogEntry, OpenSummary } from "../../../../common/types";
 
 interface RawOpenRow {
   id: number;
