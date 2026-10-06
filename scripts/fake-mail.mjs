@@ -70,7 +70,7 @@ async function appendLogs(messageId, subject, sender, recipients) {
     ),
   ];
   const rspamd = [
-    `${stamp} #1 <${crypto.randomBytes(3).toString("hex")}>; task; rspamd_task_write_log: id: <${messageId}>, qid: <${queueId}>, ip: 10.0.0.1, from: <${sender}>, (default: F (${action}): [${score}/15.00] [${subject.replaceAll(/\W+/g, "_")}]), len: 2048, time: 12.3ms, dns req: 2, digest: <${crypto.randomBytes(8).toString("hex")}>, rcpts: <${recipients.join(",")}>`,
+    `${stamp} #1 <${crypto.randomBytes(3).toString("hex")}>; task; rspamd_task_write_log: id: ${messageId}, qid: <${queueId}>, ip: 10.0.0.1, from: <${sender}>, (default: F (${action}): [${score}/15.00] [${subject.replaceAll(/\W+/g, "_")}]), len: 2048, time: 12.3ms, dns req: 2, digest: <${crypto.randomBytes(8).toString("hex")}>, rcpts: <${recipients.join(",")}>`,
   ];
   await fs.mkdir(logDir, { recursive: true });
   await Promise.all([
