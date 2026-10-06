@@ -34,21 +34,20 @@ await rm(clientOutDir, { force: true, recursive: true });
 await mkdir(path.join(clientOutDir, 'assets'), { recursive: true });
 
 await build({
-  entryPoints: [path.join(rootDir, 'client', 'main.ts')],
+  entryPoints: {
+    app: path.join(rootDir, 'client', 'dashboard', 'main.tsx'),
+    login: path.join(rootDir, 'client', 'login', 'main.tsx')
+  },
   bundle: true,
-  format: 'iife',
+  format: 'esm',
+  splitting: true,
+  jsx: 'automatic',
+  define: { 'process.env.NODE_ENV': '"production"' },
   minify: true,
-  outfile: path.join(clientOutDir, 'assets', 'app.js'),
-  platform: 'browser',
-  target: ['es2020']
-});
-
-await build({
-  entryPoints: [path.join(rootDir, 'client', 'login.ts')],
-  bundle: true,
-  format: 'iife',
-  minify: true,
-  outfile: path.join(clientOutDir, 'assets', 'login.js'),
+  outdir: path.join(clientOutDir, 'assets'),
+  entryNames: '[name]',
+  chunkNames: 'chunks/[name]-[hash]',
+  tsconfig: path.join(rootDir, 'client', 'tsconfig.json'),
   platform: 'browser',
   target: ['es2020']
 });

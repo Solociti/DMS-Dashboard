@@ -8,10 +8,10 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2022"],
     "outDir": "build/tsc"
   },
   "include": [
-    "client/**/*.ts",
     "common/**/*.ts",
     "server/**/*.ts"
   ]

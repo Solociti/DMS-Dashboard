@@ -4,7 +4,7 @@ Email tracking dashboard for Docker Mailserver with:
 
 - Node.js + Express + TypeScript API
 - Knex + SQLite open-event storage
-- Bundled browser dashboard served from `public/dist/`
+- React dashboard (React Router, lazy-loaded pages) with a separate small login bundle, served from `public/dist/`
 - Rspamd Lua postfilter for tracking-pixel injection
 - Release workflow that builds and pushes a GHCR image
 

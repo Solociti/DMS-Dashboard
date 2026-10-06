@@ -26,24 +26,23 @@ for (const file of ['index.html', 'login.html', 'styles.css']) {
 }
 
 const ctx = await context({
-  entryPoints: [path.join(rootDir, 'client', 'main.ts')],
+  entryPoints: {
+    app: path.join(rootDir, 'client', 'dashboard', 'main.tsx'),
+    login: path.join(rootDir, 'client', 'login', 'main.tsx')
+  },
   bundle: true,
-  format: 'iife',
-  outfile: path.join(clientOutDir, 'assets', 'app.js'),
+  format: 'esm',
+  splitting: true,
+  jsx: 'automatic',
+  define: { 'process.env.NODE_ENV': '"development"' },
+  outdir: path.join(clientOutDir, 'assets'),
+  entryNames: '[name]',
+  chunkNames: 'chunks/[name]-[hash]',
+  tsconfig: path.join(rootDir, 'client', 'tsconfig.json'),
   platform: 'browser',
   sourcemap: true,
   target: ['es2020']
 });
 
-const loginCtx = await context({
-  entryPoints: [path.join(rootDir, 'client', 'login.ts')],
-  bundle: true,
-  format: 'iife',
-  outfile: path.join(clientOutDir, 'assets', 'login.js'),
-  platform: 'browser',
-  sourcemap: true,
-  target: ['es2020']
-});
-
-await Promise.all([ctx.watch(), loginCtx.watch()]);
+await ctx.watch();
 console.log('[dev-client] watching client/ for changes...');

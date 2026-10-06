@@ -15,3 +15,44 @@
 - Register user, opens, logs, warnings, and tracking-blacklist routes after that middleware.
 - Preserve local authorization checks, response shapes, validation, and rate limits when moving endpoints.
 - Add or update integration coverage in `tests/server.test.js` when changing endpoint behavior or middleware boundaries.
+
+## Client (React)
+
+- The client is a React 19 app using React Router. It has two esbuild entry points: `client/login/main.tsx` (small bundle, no router) and `client/dashboard/main.tsx` (router app). Output goes to `public/dist/assets/` as ESM with code splitting.
+- Client code is type-checked with `client/tsconfig.json`, which extends the root `tsconfig.json`. Do not add DOM-dependent code under `server/`.
+- Keep each dashboard section in its own directory under `client/` (for example `client/logs/`, `client/users/`). Code shared across sections lives in `client/shared/`.
+- Define routes only in `client/dashboard/router.tsx`. Every page component must be loaded with `React.lazy` and `import()`, and therefore must be a default export.
+- Use one major React component per `.ts`/`.tsx` file. Hooks and helpers go in their own files.
+
+### Component Rules
+
+- Exported or file-global components must be declared with `function Component() {}`.
+- Subcomponents defined inside a component must be arrow function components. Keep them to a minimum; prefer a separate file for anything substantial.
+- Every exported component needs a props interface with a JSDoc comment on each prop, and a JSDoc comment on the component using this format:
+
+```tsx
+interface ComponentProps {
+  /**
+   * This does something
+   */
+  prop1: string;
+}
+
+/**
+ * Component description
+ *
+ * @param {ComponentProps} arg0 [!important, no description here]
+ */
+export default function Component({ prop1 }: ComponentProps) {}
+```
+
+### Code Style
+
+- Separate sections of code with a blank line whenever the scope changes or the code starts doing something different.
+
+```ts
+const qty = 1 + 1;
+const total = qty * 10;
+
+const filter = {};
+```
