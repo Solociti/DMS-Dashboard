@@ -1,13 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-
-import type { LogFileInfo, LogFileResponse } from "../../common/types";
+import { useEffect, useState } from "react";
+import type { LogFileInfo } from "../../common/types";
 import { fetchJson } from "../shared/fetchJson";
 import { getErrorMessage } from "../shared/getErrorMessage";
-import { useInterval } from "../shared/useInterval";
 import LogContent from "./LogContent";
 import LogList from "./LogList";
-
-const POLL_INTERVAL_MS = 10000;
 
 /**
  * Logs page: mounted log files and the tail of the selected one, refreshed every 10 seconds while mounted.
@@ -15,19 +11,7 @@ const POLL_INTERVAL_MS = 10000;
 export default function LogsPage() {
   const [logs, setLogs] = useState<LogFileInfo[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [content, setContent] = useState<LogFileResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const loadContent = useCallback((name: string) => {
-    fetchJson<LogFileResponse>(
-      `/api/logs/${encodeURIComponent(name)}?lines=200`,
-    )
-      .then((next) => {
-        setContent(next);
-        setError(null);
-      })
-      .catch((caught: unknown) => setError(getErrorMessage(caught)));
-  }, []);
 
   const loadLogs = () => {
     fetchJson<LogFileInfo[]>("/api/logs")
@@ -37,25 +21,21 @@ export default function LogsPage() {
           : (next[0]?.name ?? null);
 
         setLogs(next);
-        setSelected(name);
 
-        if (name) {
-          loadContent(name);
+        if (next.length === 0) {
+          setError(
+            "Configure LOG_FILES or mount DMS logs to inspect them here.",
+          );
         } else {
-          setContent(null);
+          setError(null);
         }
+
+        setSelected(name);
       })
       .catch((caught: unknown) => setError(getErrorMessage(caught)));
   };
 
   useEffect(loadLogs, []);
-
-  useInterval(loadLogs, POLL_INTERVAL_MS);
-
-  const handleSelect = (name: string) => {
-    setSelected(name);
-    loadContent(name);
-  };
 
   return (
     <section className="stack">
@@ -63,16 +43,11 @@ export default function LogsPage() {
         <LogList
           logs={logs}
           selected={selected}
-          onSelect={handleSelect}
+          onSelect={setSelected}
           onRefresh={loadLogs}
         />
 
-        <LogContent
-          content={content}
-          error={error}
-          empty={logs?.length === 0}
-          onTail={() => selected && loadContent(selected)}
-        />
+        <LogContent selected={selected} error={error} />
       </div>
     </section>
   );

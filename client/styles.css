@@ -109,7 +109,8 @@ button:hover {
 }
 .filter-row input,
 .filter-row select,
-.ip-input-row input {
+.ip-input-row input,
+.panel-heading select {
   min-width: 0;
   border: 1px solid rgba(84, 125, 168, 0.45);
   border-radius: 12px;
@@ -305,6 +306,7 @@ tbody tr:hover,
   background: #050b12;
   border: 1px solid rgba(84, 125, 168, 0.18);
   white-space: pre-wrap;
+  font: monospace;
 }
 .blacklist-form {
   display: grid;
