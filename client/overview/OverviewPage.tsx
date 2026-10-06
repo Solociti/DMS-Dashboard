@@ -78,7 +78,7 @@ export default function OverviewPage() {
         daily={daily}
         totalMessages={result?.total ?? 0}
         totalOpens={result?.totalOpens ?? 0}
-        lastActivity={result?.items[0]?.lastOpened ?? null}
+        lastActivity={result?.lastActivity ?? null}
       />
 
       <MessageFilters filters={filters} onChange={handleFiltersChange} />

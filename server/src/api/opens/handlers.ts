@@ -98,7 +98,12 @@ export async function getOpenSummaries(
     .from(query.clone().as("filtered"))
     .count({ total: "*" })
     .sum({ total_opens: "total_opens" })
-    .first()) as { total: number | string; total_opens: number | string | null };
+    .max({ last_activity: "last_opened" })
+    .first()) as {
+    total: number | string;
+    total_opens: number | string | null;
+    last_activity: string | null;
+  };
 
   if (filters.sort === "sent") {
     query.orderBy("messages.sent_at", filters.direction);
@@ -114,6 +119,7 @@ export async function getOpenSummaries(
   return {
     total: Number(totals.total),
     totalOpens: Number(totals.total_opens ?? 0),
+    lastActivity: totals.last_activity ?? null,
     page: filters.page,
     pageSize: OPEN_PAGE_SIZE,
     items: rows.map((row) => ({

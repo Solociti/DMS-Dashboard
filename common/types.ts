@@ -14,6 +14,8 @@ export interface OpenSummaryPage {
   total: number;
   /** Opens across all matching messages. */
   totalOpens: number;
+  /** Most recent open across all matching messages. */
+  lastActivity: string | null;
   page: number;
   pageSize: number;
 }
