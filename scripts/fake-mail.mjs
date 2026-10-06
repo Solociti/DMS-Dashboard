@@ -152,7 +152,7 @@ if (!loginResponse.ok) {
 }
 const cookie = loginResponse.headers.getSetCookie()[0].split(";")[0];
 
-const summaries = await (
+const { items: summaries } = await (
   await fetch(`${baseUrl}/api/opens`, { headers: { Cookie: cookie } })
 ).json();
 // /api/opens only lists opened messages, so add this run's messages to the pool.
