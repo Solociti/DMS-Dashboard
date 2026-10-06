@@ -63,7 +63,7 @@ export default function BlacklistPage() {
   };
 
   return (
-    <section className="panel stack">
+    <section className="stack">
       <div className="panel-heading">
         <div>
           <h2>Excluded senders</h2>

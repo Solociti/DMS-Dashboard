@@ -23,7 +23,7 @@ export default function UsersPage() {
     (users ? `${users.length} user${users.length === 1 ? "" : "s"}` : "");
 
   return (
-    <section className="panel stack">
+    <section className="stack">
       <div className="panel-heading">
         <div>
           <h2>Users</h2>
@@ -36,7 +36,7 @@ export default function UsersPage() {
       </p>
 
       <div className="table-wrap">
-        <table>
+        <table id="users-table">
           <thead>
             <tr>
               <th>ID</th>

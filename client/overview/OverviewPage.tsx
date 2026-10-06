@@ -36,7 +36,7 @@ export default function OverviewPage() {
   }, [load]);
 
   return (
-    <section className="panel stack">
+    <section className="stack">
       <StatCards rows={rows ?? []} />
 
       <div className="content-grid">

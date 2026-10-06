@@ -58,7 +58,7 @@ export default function LogsPage() {
   };
 
   return (
-    <section className="panel stack">
+    <section className="stack">
       <div className="content-grid logs-grid">
         <LogList
           logs={logs}

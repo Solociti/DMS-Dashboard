@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router";
 
 import { redirectToLogin } from "../shared/redirectToLogin";
@@ -10,6 +10,11 @@ import WarningsPanel from "../warnings/WarningsPanel";
 export default function DashboardLayout() {
   const { pathname } = useLocation();
   const isUsersRoute = pathname.startsWith("/dashboard/users");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -18,30 +23,36 @@ export default function DashboardLayout() {
 
   return (
     <div className="page-shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Email tracking</p>
-          <h1>DMS Dashboard</h1>
-          <p className="subtitle">
-            Track opens, inspect individual events, and view mounted Docker
-            Mailserver logs.
-          </p>
-        </div>
+      <header className="topbar">
+        <strong className="brand">DMS Dashboard</strong>
 
-        <button type="button" onClick={handleLogout}>
-          Sign out
+        <button
+          type="button"
+          className="menu-toggle"
+          aria-label="Toggle navigation"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          ☰
         </button>
+
+        <nav
+          className={menuOpen ? "tabs open" : "tabs"}
+          aria-label="Views"
+        >
+          <NavLink to="/dashboard" end>
+            Overview
+          </NavLink>
+          <NavLink to="/dashboard/logs">Logs</NavLink>
+          <NavLink to="/dashboard/blacklist">Excluded senders</NavLink>
+          <NavLink to="/dashboard/users">Users</NavLink>
+          <button type="button" className="signout" onClick={handleLogout}>
+            Sign out
+          </button>
+        </nav>
       </header>
 
-      <nav className="tabs" aria-label="Views">
-        <NavLink to="/dashboard" end>
-          Overview
-        </NavLink>
-        <NavLink to="/dashboard/logs">Logs</NavLink>
-        <NavLink to="/dashboard/blacklist">Excluded senders</NavLink>
-        <NavLink to="/dashboard/users">Users</NavLink>
-      </nav>
-
+      <div className="content">
       {isUsersRoute ? null : <WarningsPanel key={pathname} />}
 
       <main className="layout">
@@ -49,6 +60,7 @@ export default function DashboardLayout() {
           <Outlet />
         </Suspense>
       </main>
+      </div>
     </div>
   );
 }
