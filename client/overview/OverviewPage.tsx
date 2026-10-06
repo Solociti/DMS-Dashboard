@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { DailyStat, OpenSummaryPage } from "../../common/types";
 import { fetchJson } from "../shared/fetchJson";
 import { getErrorMessage } from "../shared/getErrorMessage";
+import Modal from "../shared/Modal";
+import { useMediaQuery } from "../shared/useMediaQuery";
 import MessageDetails from "./MessageDetails";
 import MessageFilters, { type MessageFilterValues } from "./MessageFilters";
 import MessageTable from "./MessageTable";
@@ -20,6 +22,8 @@ export default function OverviewPage() {
   const [version, setVersion] = useState(0);
   const [filters, setFilters] = useState(() => getMessageFilters());
   const [daily, setDaily] = useState<DailyStat[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 960px)");
 
   useEffect(() => {
     fetchJson<DailyStat[]>("/api/opens/daily")
@@ -84,7 +88,10 @@ export default function OverviewPage() {
           rows={result?.items ?? null}
           error={error}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={(msgId) => {
+            setSelectedId(msgId);
+            setModalOpen(true);
+          }}
           onRefresh={load}
           filters={filters}
           onFiltersChange={handleFiltersChange}
@@ -94,12 +101,24 @@ export default function OverviewPage() {
           onPageChange={setPage}
         />
 
-        <MessageDetails
-          msgId={selectedId}
-          version={version}
-          loadFailed={error !== null}
-        />
+        {isMobile ? null : (
+          <MessageDetails
+            msgId={selectedId}
+            version={version}
+            loadFailed={error !== null}
+          />
+        )}
       </div>
+
+      {isMobile && modalOpen ? (
+        <Modal onClose={() => setModalOpen(false)}>
+          <MessageDetails
+            msgId={selectedId}
+            version={version}
+            loadFailed={error !== null}
+          />
+        </Modal>
+      ) : null}
     </section>
   );
 }
