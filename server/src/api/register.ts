@@ -3,6 +3,7 @@ import path from "node:path";
 
 import registerAuth from "./auth/register";
 import { requireAuthenticatedApi } from "./auth/handlers";
+import registerIgnoredIps from "./ignored-ips/register";
 import registerLogs from "./logs/register";
 import registerMessages from "./messages/register";
 import registerOpens from "./opens/register";
@@ -35,6 +36,14 @@ export default function registerApi(
   const openRoutes = express.Router();
   registerOpens(openRoutes, dependencies.database, limiters.opens);
   router.use("/opens", openRoutes);
+
+  const ignoredIpRoutes = express.Router();
+  registerIgnoredIps(
+    ignoredIpRoutes,
+    dependencies.database,
+    limiters.general,
+  );
+  router.use("/ignored-ips", ignoredIpRoutes);
 
   const logRoutes = express.Router();
   registerLogs(logRoutes, dependencies.logRegistry, limiters.general);

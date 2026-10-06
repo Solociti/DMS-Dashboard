@@ -588,7 +588,7 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
 
     const summaries = await waitFor(async () => {
       const response = await authFetch(`${baseUrl}/api/opens`, cookie);
-      const payload = await response.json();
+      const payload = (await response.json()).items;
       return payload.length ? payload : null;
     });
     assert.equal(summaries.length, 1);
@@ -627,6 +627,93 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
       (await missingLogResponse.json()).error,
       "Unknown log file: unknown",
     );
+  } finally {
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+    await database.destroy();
+  }
+});
+
+test("opens API filters, sorts and hides ignored IPs", async () => {
+  const root = await makeTempDir();
+  const dmsRoot = path.join(root, "dms");
+  const rspamdDir = path.join(dmsRoot, "rspamd");
+  const publicDir = path.join(root, "public");
+  const publicDistDir = path.join(publicDir, "dist");
+  const luaSource = path.join(root, "rspamd.local.lua");
+  const logPath = path.join(dmsRoot, "logs", "rspamd.log");
+
+  await fs.mkdir(rspamdDir, { recursive: true });
+  await fs.mkdir(path.dirname(logPath), { recursive: true });
+  await fs.mkdir(publicDistDir, { recursive: true });
+  await fs.writeFile(luaSource, "-- lua");
+  await fs.writeFile(logPath, "");
+
+  const { app, database } = await createServerApplication({
+    appRoot: root,
+    port: 0,
+    databasePath: path.join(root, "data", "tracker.sqlite"),
+    dmsRoot,
+    rspamdDir,
+    trustProxy: true,
+    trackingBaseUrl: "https://tracker.example.com",
+    trackingApiToken: "test-token",
+    trackingLuaSourcePath: luaSource,
+    publicRoot: publicDir,
+    publicDistRoot: publicDistDir,
+    logFiles: { rspamd: logPath },
+  });
+
+  const server = await new Promise((resolve) => {
+    const instance = app.listen(0, () => resolve(instance));
+  });
+
+  try {
+    const baseUrl = `http://127.0.0.1:${server.address().port}`;
+    const cookie = await authenticateAdmin(baseUrl);
+
+    await database("messages").insert([
+      { uid: "a", subject: "Invoice", sender: "admin@example.com", recipients: "[]", sent_at: "2026-10-01T00:00:00.000Z" },
+      { uid: "b", subject: "Hello", sender: "other@example.com", recipients: "[]", sent_at: "2026-10-02T00:00:00.000Z" },
+    ]);
+    await database("opens").insert([
+      { msg_id: "a", ip_address: "203.0.113.10" },
+      { msg_id: "b", ip_address: "198.51.100.7" },
+    ]);
+
+    const list = async (query) =>
+      (await (await authFetch(`${baseUrl}/api/opens?${query}`, cookie)).json()).items.map((row) => row.msgId);
+
+    assert.deepEqual(await list("sort=sent&dir=asc"), ["a", "b"]);
+    assert.deepEqual(await list("sort=sent&dir=desc"), ["b", "a"]);
+    assert.deepEqual(await list("scope=mine"), ["a"]);
+    assert.deepEqual(await list("q=hello"), ["b"]);
+
+    const invalid = await authFetch(`${baseUrl}/api/ignored-ips`, cookie, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ip: "not-an-ip" }),
+    });
+    assert.equal(invalid.status, 400);
+
+    const added = await (
+      await authFetch(`${baseUrl}/api/ignored-ips`, cookie, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ip: "203.0.113.10", note: "Home" }),
+      })
+    ).json();
+    assert.deepEqual(added.ips, [{ ip: "203.0.113.10", note: "Home" }]);
+    assert.deepEqual(await list(""), ["b"]);
+
+    const removed = await (
+      await authFetch(`${baseUrl}/api/ignored-ips/203.0.113.10`, cookie, {
+        method: "DELETE",
+      })
+    ).json();
+    assert.deepEqual(removed.ips, []);
+    assert.equal((await list("")).length, 2);
   } finally {
     await new Promise((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

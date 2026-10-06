@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router";
 
 import { redirectToLogin } from "../shared/redirectToLogin";
 import WarningsPanel from "../warnings/WarningsPanel";
+import IgnoreMyIpButton from "./IgnoreMyIpButton";
 
 /**
  * Dashboard shell with the header, tab navigation, warnings and the lazy-loaded page outlet.
@@ -36,16 +37,14 @@ export default function DashboardLayout() {
           ☰
         </button>
 
-        <nav
-          className={menuOpen ? "tabs open" : "tabs"}
-          aria-label="Views"
-        >
+        <nav className={menuOpen ? "tabs open" : "tabs"} aria-label="Views">
           <NavLink to="/dashboard" end>
             Overview
           </NavLink>
-          <NavLink to="/dashboard/logs">Logs</NavLink>
-          <NavLink to="/dashboard/blacklist">Excluded senders</NavLink>
+          <NavLink to="/dashboard/settings">Settings</NavLink>
           <NavLink to="/dashboard/users">Users</NavLink>
+          <NavLink to="/dashboard/logs">Logs</NavLink>
+          <IgnoreMyIpButton />
           <button type="button" className="signout" onClick={handleLogout}>
             Sign out
           </button>
@@ -53,13 +52,13 @@ export default function DashboardLayout() {
       </header>
 
       <div className="content">
-      {isUsersRoute ? null : <WarningsPanel key={pathname} />}
+        {isUsersRoute ? null : <WarningsPanel key={pathname} />}
 
-      <main className="layout">
-        <Suspense fallback={<p className="muted">Loading…</p>}>
-          <Outlet />
-        </Suspense>
-      </main>
+        <main className="layout">
+          <Suspense fallback={<p className="muted">Loading…</p>}>
+            <Outlet />
+          </Suspense>
+        </main>
       </div>
     </div>
   );

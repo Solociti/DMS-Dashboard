@@ -8,6 +8,16 @@ export interface OpenSummary {
   recipients: string[];
 }
 
+export interface OpenSummaryPage {
+  items: OpenSummary[];
+  /** Messages matching the filters across all pages. */
+  total: number;
+  /** Opens across all matching messages. */
+  totalOpens: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface OpenLogEntry {
   id: number;
   msgId: string;
@@ -43,3 +53,17 @@ export interface WarningState {
 export interface TrackingBlacklistResponse {
   addresses: string[];
 }
+
+export interface IgnoredIp {
+  ip: string;
+  note: string | null;
+}
+
+export interface IgnoredIpsResponse {
+  ips: IgnoredIp[];
+  currentIp: string | null;
+}
+
+export type OpenScope = "mine" | "all";
+export type OpenSortField = "sent" | "opened";
+export type SortDirection = "asc" | "desc";

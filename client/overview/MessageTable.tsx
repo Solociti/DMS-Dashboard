@@ -1,5 +1,9 @@
 import type { OpenSummary } from "../../common/types";
 import { formatDate } from "../shared/formatDate";
+import { MessageFilterValues } from "./MessageFilters";
+
+const upArrow = "↑";
+const downArrow = "↓";
 
 interface MessageTableProps {
   /**
@@ -26,6 +30,36 @@ interface MessageTableProps {
    * Called when the refresh button is pressed.
    */
   onRefresh: () => void;
+
+  /**
+   * Current filter values.
+   */
+  filters: MessageFilterValues;
+
+  /**
+   * Called with the full updated filter values on any change.
+   */
+  onFiltersChange: (filters: MessageFilterValues) => void;
+
+  /**
+   * Current 1-based page.
+   */
+  page: number;
+
+  /**
+   * Rows per page.
+   */
+  pageSize: number;
+
+  /**
+   * Matching messages across all pages.
+   */
+  total: number;
+
+  /**
+   * Called with the new page number.
+   */
+  onPageChange: (page: number) => void;
 }
 
 /**
@@ -34,12 +68,20 @@ interface MessageTableProps {
  * @param {MessageTableProps} arg0 [!important, selection is controlled by the parent]
  */
 export default function MessageTable({
-  rows,
   error,
+  filters,
+  rows,
   selectedId,
-  onSelect,
+  onFiltersChange,
+  onPageChange,
   onRefresh,
+  onSelect,
+  page,
+  pageSize,
+  total,
 }: MessageTableProps) {
+  const lastPage = Math.max(1, Math.ceil(total / pageSize));
+
   const MessageRow = ({ row }: { row: OpenSummary }) => (
     <tr
       className={row.msgId === selectedId ? "active" : undefined}
@@ -47,7 +89,10 @@ export default function MessageTable({
     >
       <td>
         <strong>
-          {!row.subject && !row.sender && row.recipients.length === 0 && !row.sentAt
+          {!row.subject &&
+          !row.sender &&
+          row.recipients.length === 0 &&
+          !row.sentAt
             ? row.msgId
             : (row.subject ?? "(no subject)")}
         </strong>
@@ -79,12 +124,50 @@ export default function MessageTable({
         <table>
           <thead>
             <tr>
-              <th>Message</th>
-              <th>From</th>
-              <th>To</th>
-              <th>Sent</th>
-              <th>Opens</th>
-              <th>Last Opened</th>
+              <th className="text-nowrap">Message</th>
+              <th className="text-nowrap">From</th>
+              <th className="text-nowrap">To</th>
+              <th
+                className="text-nowrap cursor-pointer"
+                onClick={() => {
+                  onFiltersChange({
+                    ...filters,
+                    sort: "sent",
+                    direction:
+                      filters.sort === "sent" && filters.direction === "asc"
+                        ? "desc"
+                        : "asc",
+                  });
+                }}
+              >
+                Sent{" "}
+                {filters.sort === "sent"
+                  ? filters.direction === "asc"
+                    ? upArrow
+                    : downArrow
+                  : null}
+              </th>
+              <th className="text-nowrap">Opens</th>
+              <th
+                className="text-nowrap cursor-pointer"
+                onClick={() => {
+                  onFiltersChange({
+                    ...filters,
+                    sort: "opened",
+                    direction:
+                      filters.sort === "opened" && filters.direction === "asc"
+                        ? "desc"
+                        : "asc",
+                  });
+                }}
+              >
+                Last Opened{" "}
+                {filters.sort === "opened"
+                  ? filters.direction === "asc"
+                    ? upArrow
+                    : downArrow
+                  : null}
+              </th>
             </tr>
           </thead>
 
@@ -94,9 +177,32 @@ export default function MessageTable({
             {!error && rows?.length === 0 ? (
               <Message text="No tracking data yet." />
             ) : null}
-            {!error && rows?.map((row) => <MessageRow key={row.msgId} row={row} />)}
+            {!error &&
+              rows?.map((row) => <MessageRow key={row.msgId} row={row} />)}
           </tbody>
         </table>
+      </div>
+
+      <div className="pagination">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Previous
+        </button>
+
+        <span className="muted">
+          Page {page} of {lastPage}
+        </span>
+
+        <button
+          type="button"
+          disabled={page >= lastPage}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next
+        </button>
       </div>
     </section>
   );

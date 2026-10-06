@@ -1,26 +1,37 @@
-import type { OpenSummary } from "../../common/types";
 import { formatDate } from "../shared/formatDate";
 
 interface StatCardsProps {
   /**
-   * Tracked message summaries used to compute the totals.
+   * Messages matching the current filters, across all pages.
    */
-  rows: OpenSummary[];
+  totalMessages: number;
+
+  /**
+   * Opens across all matching messages.
+   */
+  totalOpens: number;
+
+  /**
+   * Most recent open on the current page, if any.
+   */
+  lastActivity: string | null;
 }
 
 /**
  * Summary cards for tracked messages, total opens and last activity.
  *
- * @param {StatCardsProps} arg0 [!important, rows are expected newest-opened first]
+ * @param {StatCardsProps} arg0 [!important, totals cover all pages]
  */
-export default function StatCards({ rows }: StatCardsProps) {
-  const totalOpens = rows.reduce((sum, row) => sum + row.totalOpens, 0);
-
+export default function StatCards({
+  totalMessages,
+  totalOpens,
+  lastActivity,
+}: StatCardsProps) {
   return (
     <div className="stats-grid">
       <article className="stat-card">
         <h2>Tracked messages</h2>
-        <p>{rows.length}</p>
+        <p>{totalMessages}</p>
       </article>
 
       <article className="stat-card">
@@ -30,7 +41,7 @@ export default function StatCards({ rows }: StatCardsProps) {
 
       <article className="stat-card">
         <h2>Last activity</h2>
-        <p>{rows.length > 0 ? formatDate(rows[0].lastOpened) : "No opens yet"}</p>
+        <p>{lastActivity ? formatDate(lastActivity) : "No opens yet"}</p>
       </article>
     </div>
   );

@@ -7,9 +7,9 @@ import BlacklistForm from "./BlacklistForm";
 import BlacklistList from "./BlacklistList";
 
 /**
- * Excluded senders page: add and remove addresses from the tracking blacklist.
+ * Excluded senders section: add and remove addresses from the tracking blacklist.
  */
-export default function BlacklistPage() {
+export default function BlacklistSection() {
   const [addresses, setAddresses] = useState<string[] | null>(null);
   const [status, setStatus] = useState("");
 
@@ -66,7 +66,7 @@ export default function BlacklistPage() {
     <section className="stack">
       <div className="panel-heading">
         <div>
-          <h2>Excluded senders</h2>
+          <h3>Excluded senders</h3>
           <p className="muted">
             {addresses === null
               ? "Loading addresses…"

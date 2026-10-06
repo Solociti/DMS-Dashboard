@@ -100,6 +100,7 @@ async function createMessage(token) {
       subject,
       sender,
       recipients,
+      sent_at: Math.floor(Date.now() / 1000 - Math.random() * 3600),
       user: address(),
     }),
   });

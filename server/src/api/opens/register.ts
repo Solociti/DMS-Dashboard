@@ -2,16 +2,24 @@ import type { RequestHandler, Router } from "express";
 import type { Knex } from "knex";
 
 import { getOpenEvents, getOpenSummaries } from "./handlers";
-import { getOpenRouteParam } from "./helpers";
+import { getOpenRouteParam, parseOpenFilters } from "./helpers";
+import { getAuthenticatedUser } from "../../auth";
 
 export default function registerOpens(
   router: Router,
   database: Knex,
   rateLimiter: RequestHandler,
 ): void {
-  router.get("/", rateLimiter, async (_request, response, next) => {
+  router.get("/", rateLimiter, async (request, response, next) => {
     try {
-      response.json(await getOpenSummaries(database));
+      const user = await getAuthenticatedUser(database, request);
+      response.json(
+        await getOpenSummaries(
+          database,
+          parseOpenFilters(request.query),
+          user?.email ?? null,
+        ),
+      );
     } catch (error) {
       next(error);
     }

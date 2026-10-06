@@ -6,7 +6,7 @@ import RequireSession from "../session/RequireSession";
 
 const OverviewPage = lazy(() => import("../overview/OverviewPage"));
 const LogsPage = lazy(() => import("../logs/LogsPage"));
-const BlacklistPage = lazy(() => import("../blacklist/BlacklistPage"));
+const SettingsPage = lazy(() => import("../settings/SettingsPage"));
 const UsersPage = lazy(() => import("../users/UsersPage"));
 
 export const router = createBrowserRouter([
@@ -19,7 +19,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <OverviewPage /> },
           { path: "logs", element: <LogsPage /> },
-          { path: "blacklist", element: <BlacklistPage /> },
+          { path: "settings", element: <SettingsPage /> },
           { path: "users", element: <UsersPage /> },
         ],
       },
