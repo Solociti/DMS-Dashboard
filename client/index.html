@@ -8,7 +8,7 @@
     <script defer src="/dashboard/assets/app.js"></script>
   </head>
   <body>
-    <div class="page-shell">
+    <div id="dashboard-content" class="page-shell hidden">
       <header class="hero">
         <div>
           <p class="eyebrow">Email tracking</p>
@@ -18,12 +18,14 @@
             Mailserver logs.
           </p>
         </div>
+        <button id="logout-button" type="button">Sign out</button>
       </header>
 
       <nav class="tabs" aria-label="Views">
         <a href="/dashboard" data-tab="overview">Overview</a>
         <a href="/dashboard/logs" data-tab="logs">Logs</a>
         <a href="/dashboard/blacklist" data-tab="blacklist">Excluded senders</a>
+        <a href="/dashboard/users" data-tab="users">Users</a>
       </nav>
 
       <section id="warning-panel" class="panel warning-panel hidden">
@@ -153,6 +155,31 @@ Select a log to view its contents.</pre
           <ul id="blacklist-list" class="blacklist-list">
             <li>Loading…</li>
           </ul>
+        </section>
+
+        <section id="users-view" class="panel stack hidden">
+          <div class="panel-heading">
+            <div>
+              <h2>Users</h2>
+              <p class="muted">Update account email addresses and passwords.</p>
+            </div>
+          </div>
+          <p id="users-status" class="muted" role="status" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table id="users-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Email</th>
+                  <th>New password</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body">
+                <tr><td colspan="4">Loading users…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
       </main>
     </div>

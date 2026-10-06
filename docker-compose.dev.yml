@@ -4,19 +4,22 @@ services:
       context: .
       dockerfile: server/Dockerfile
       target: dev
+    init: true
+    # `pnpm run dev` pre-creates the bind-mount dirs and sets DEV_UID/DEV_GID to the host user;
+    # without it Compose would create them as root and SQLite could not write /data.
+    user: "${DEV_UID:-1000}:${DEV_GID:-1000}"
     env_file:
       - example.env
     environment:
+      - HOME=/tmp
       - DATABASE_PATH=/data/tracker.sqlite
+      - SEED_FAKE_USER=true
       - TRACKING_BASE_URL=localhost:3000
     ports:
       - "3000:3000"
     volumes:
       - .:/app
       - /app/node_modules
-      - dev-data:/data
+      - ./dms-root/dev-data:/data
       - ./dms-root:/dms
     command: pnpm run dev:container
-
-volumes:
-  dev-data:

@@ -114,7 +114,21 @@ tbody tr:hover, .log-list button:hover { background: rgba(134, 185, 243, 0.08); 
   padding: 0.7rem 0.9rem;
 }
 .blacklist-list code { min-width: 0; overflow-wrap: anywhere; color: #c4d3e2; }
+#users-table input { width: 100%; min-width: 190px; border: 1px solid rgba(84, 125, 168, 0.45); border-radius: 8px; background: #050b12; color: #e5eef8; padding: 0.65rem 0.75rem; font: inherit; }
+#users-table input:focus { outline: 2px solid #86b9f3; outline-offset: 2px; }
+#users-table .user-id { color: #9ab3cc; font-variant-numeric: tabular-nums; }
+#users-table td:last-child { min-width: 180px; }
+#users-table td:last-child span { display: block; margin-top: 0.35rem; color: #9ab3cc; }
 button:disabled { opacity: 0.6; cursor: wait; }
+.auth-screen { min-height: 100vh; display: grid; place-items: center; padding: 1.25rem; }
+.auth-panel { width: min(100%, 440px); padding: 2rem; border: 1px solid rgba(84, 125, 168, 0.35); border-radius: 18px; background: rgba(9, 19, 31, 0.92); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4); }
+.auth-panel h1 { margin: 0.35rem 0 1.5rem; }
+.auth-form { display: grid; gap: 0.65rem; }
+.auth-form label { margin-top: 0.35rem; color: #c4d3e2; font-size: 0.9rem; }
+.auth-form input { min-width: 0; border: 1px solid rgba(84, 125, 168, 0.45); border-radius: 8px; background: #050b12; color: #e5eef8; padding: 0.75rem 0.85rem; font: inherit; }
+.auth-form input:focus { outline: 2px solid #86b9f3; outline-offset: 2px; }
+.auth-form button { margin-top: 0.65rem; border-radius: 8px; }
+.auth-status { min-height: 1.4em; margin: 1rem 0 0; color: #ffd28f; }
 .hidden { display: none; }
 @media (max-width: 960px) {
   .hero, .panel-heading { flex-direction: column; align-items: stretch; }

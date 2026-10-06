@@ -8,7 +8,7 @@
     "start": "node ./build/server/index.js",
     "typecheck": "tsc --noEmit",
     "test": "node ./scripts/build.mjs && node --test tests/**/*.test.js",
-    "dev": "docker compose -f docker-compose.dev.yml up --build",
+    "dev": "node ./scripts/dev.mjs",
     "dev:container": "concurrently -n client,server -c blue,green \"npm:dev:client\" \"npm:dev:server\"",
     "dev:client": "node ./scripts/dev-client.mjs",
     "dev:server": "tsx watch server/src/index.ts",
