@@ -7,6 +7,7 @@ import {
   getAuthenticatedUser,
   hashPassword,
 } from "../../auth";
+import { warnApi } from "../log";
 import { getUserRouteParam } from "./helpers";
 
 export function listUsers(database: Knex): RequestHandler {
@@ -14,6 +15,7 @@ export function listUsers(database: Knex): RequestHandler {
     try {
       const currentUser = await getAuthenticatedUser(database, request);
       if (!currentUser || !canManageUsers(currentUser)) {
+        warnApi(request, "Forbidden");
         response.status(403).json({ error: "Administrator access required" });
         return;
       }
@@ -39,6 +41,7 @@ export function updateUser(database: Knex): RequestHandler {
     try {
       const currentUser = await getAuthenticatedUser(database, request);
       if (!currentUser || !canManageUsers(currentUser)) {
+        warnApi(request, "Forbidden");
         response.status(403).json({ error: "Administrator access required" });
         return;
       }

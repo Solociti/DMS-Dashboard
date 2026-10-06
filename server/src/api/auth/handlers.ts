@@ -11,6 +11,7 @@ import {
   setSessionCookie,
   verifyPassword,
 } from "../../auth";
+import { warnApi } from "../log";
 
 export function login(database: Knex): RequestHandler {
   return async (request, response, next) => {
@@ -23,6 +24,7 @@ export function login(database: Knex): RequestHandler {
         typeof request.body?.password === "string" ? request.body.password : "";
       const user = await database("users").where({ email }).first();
       if (!user || !(await verifyPassword(password, user.password_hash))) {
+        warnApi(request, "Unauthorized");
         response.status(401).json({ error: "Invalid email or password" });
         return;
       }
@@ -84,6 +86,7 @@ export function changePassword(database: Knex): RequestHandler {
     try {
       const user = await getAuthenticatedUser(database, request);
       if (!user) {
+        warnApi(request, "Unauthorized");
         response.status(401).json({ error: "Authentication required" });
         return;
       }
@@ -132,11 +135,13 @@ export function requireAuthenticatedApi(database: Knex): RequestHandler {
     try {
       const user = await getAuthenticatedUser(database, request);
       if (!user) {
+        warnApi(request, "Unauthorized");
         response.status(401).json({ error: "Authentication required" });
         return;
       }
 
       if (user.mustChangePassword) {
+        warnApi(request, "Forbidden");
         response.status(403).json({
           error: "Update your password before continuing",
           code: "password-change-required",
