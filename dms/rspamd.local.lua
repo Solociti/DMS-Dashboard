@@ -157,12 +157,12 @@ local function inject_tracking_pixel(task)
 
             if name:lower() == "content-type" then
                 local nct = string.format(
-                    "Content-Type: %s/%s; charset=utf-8",
+                    "%s/%s; charset=utf-8",
                     rewrite.new_ct.type,
                     rewrite.new_ct.subtype
                 )
 
-                out[#out + 1] = nct
+                out[#out + 1] = "Content-Type: " .. nct
 
                 task:set_milter_reply({
                     remove_headers = {
