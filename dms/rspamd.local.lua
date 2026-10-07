@@ -20,14 +20,19 @@ local function is_blacklisted_sender(task, address)
         return false
     end
 
-    for blacklisted_sender in blacklist:lines() do
-        if address:lower() == blacklisted_sender:lower() then
-            blacklist:close()
-            return true
+    for line in blacklist:lines() do
+        local blacklisted_sender = line:match("^%s*(.-)%s*$")
+
+        if blacklisted_sender ~= "" then
+            if address:lower() == blacklisted_sender:lower() then
+                blacklist:close()
+                return true
+            end
         end
     end
 
     blacklist:close()
+
     return false
 end
 
@@ -96,7 +101,9 @@ local function inject_tracking_pixel(task)
         return
     end
 
-    local sender = task:get_from("mime")
+    -- get_from() returns a list of address tables, not a single table.
+    local senders = task:get_from("mime")
+    local sender = senders and senders[1]
     local sender_address = sender and sender.addr
 
     if sender_address and is_blacklisted_sender(task, sender_address) then
