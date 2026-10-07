@@ -23,6 +23,8 @@ export default function LogContent({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [query, setQuery] = useState("");
+
   const loadContent = useCallback((name: string) => {
     setIsLoading(true);
     fetchJson<LogFileResponse>(
@@ -74,11 +76,22 @@ export default function LogContent({
       return logListError;
     }
 
-    if (content) {
-      return content.content || "No log content available.";
+    if (content && content.content) {
+      if (query) {
+        return content.content
+          .split("\n")
+          .filter((line) => line.toLowerCase().includes(query.toLowerCase()))
+          .join("\n");
+      }
+
+      return content.content;
     }
 
-    return "Select a log to view its contents.";
+    if (!selected) {
+      return "Select a log to view its contents.";
+    }
+
+    return "No log content available.";
   })();
 
   return (
@@ -91,6 +104,16 @@ export default function LogContent({
               : "Log output"}
           </h2>
           <small className="muted">Showing last 200 lines.</small>
+        </div>
+
+        <div className="filter-row">
+          <input
+            type="search"
+            aria-label="Search"
+            placeholder="Search logs"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
         </div>
 
         <div>
