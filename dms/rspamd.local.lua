@@ -7,10 +7,16 @@ local TRACKING_DOMAIN = "__TRACKING_BASE_URL__"
 local TRACKING_API_TOKEN = "__TRACKING_API_TOKEN__"
 local TRACKING_BLACKLIST_PATH = "/etc/rspamd/tracking-blacklist.txt"
 
-local function is_blacklisted_sender(address)
-    local blacklist = io.open(TRACKING_BLACKLIST_PATH, "r")
+local function is_blacklisted_sender(task, address)
+    local blacklist, open_err = io.open(TRACKING_BLACKLIST_PATH, "r")
 
     if not blacklist then
+        rspamd_logger.warnx(
+            task,
+            "TRACKING_PIXEL: cannot open blacklist %s: %s",
+            TRACKING_BLACKLIST_PATH,
+            tostring(open_err)
+        )
         return false
     end
 
@@ -93,8 +99,8 @@ local function inject_tracking_pixel(task)
     local sender = task:get_from("mime")
     local sender_address = sender and sender.addr
 
-    if sender_address and is_blacklisted_sender(sender_address) then
-        rspamd_logger.infox(
+    if sender_address and is_blacklisted_sender(task, sender_address) then
+        rspamd_logger.warnx(
             task,
             "TRACKING_PIXEL: skipping blacklisted sender %s",
             sender_address
@@ -120,7 +126,7 @@ local function inject_tracking_pixel(task)
         uid
     )
 
-    rspamd_logger.infox(
+    rspamd_logger.warnx(
         task,
         "TRACKING_PIXEL: injecting pixel for %s (%s)",
         uid,
@@ -254,7 +260,7 @@ local function inject_tracking_pixel(task)
         return
     end
 
-    rspamd_logger.infox(
+    rspamd_logger.warnx(
         task,
         "TRACKING_PIXEL: message rewritten successfully, size=%s",
         tostring(size)
