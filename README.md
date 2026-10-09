@@ -8,15 +8,12 @@ Know when your email gets read. DMS Dashboard adds open tracking and a clean web
 
 ### Desktop
 
-<!-- Add desktop screenshots to public/images/screenshots/ -->
-
-![Desktop overview](public/images/screenshots/desktop-overview.png)
+<img src="screenshots/desktop-overview.png" alt="Desktop overview" width="720" style="border: 1px solid #ccc; border-radius: 8px;">
 
 ### Mobile
 
-<!-- Add mobile screenshots to public/images/screenshots/ -->
-
-![Mobile overview](public/images/screenshots/mobile-overview.png)
+<img src="screenshots/mobile-overview.png" alt="Mobile overview" width="240" style="margin-right: 1rem; border: 1px solid #ccc; border-radius: 8px;">
+<img src="screenshots/mobile-details.png" alt="Mobile details" width="240" style="margin-right: 1rem; border: 1px solid #ccc; border-radius: 8px;">
 
 ## Features
 
