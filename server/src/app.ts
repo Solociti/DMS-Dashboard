@@ -4,6 +4,7 @@ import path from "node:path";
 
 import registerApi from "./api/register";
 import { createApiRateLimiters } from "./api/rate-limits";
+import { recordOpenHit } from "./api/opens/counts";
 import { getAuthenticatedUser } from "./auth";
 import type { AppConfig } from "./config";
 import type { LogRegistry } from "./logs";
@@ -95,12 +96,11 @@ export function createApp(
           `[${new Date().toISOString()}] ${request.baseUrl} MessageId: ${msgId} IP: ${getClientIp(request)}`,
         );
 
-        void database("opens")
-          .insert({
-            msg_id: msgId,
-            ip_address: getClientIp(request),
-            user_agent: request.header("user-agent") || null,
-          })
+        void recordOpenHit(database, {
+          msgId,
+          ipAddress: getClientIp(request),
+          userAgent: request.header("user-agent") || null,
+        })
           .catch((error: unknown) => {
             console.error(error instanceof Error ? error.message : error);
           });

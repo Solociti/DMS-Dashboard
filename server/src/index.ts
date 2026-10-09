@@ -1,5 +1,9 @@
 import type { Server } from "node:http";
 import { createApp } from "./app";
+import {
+  recalculateOpenCounts,
+  scheduleDailyAtTwoAm,
+} from "./api/opens/counts";
 import { deleteExpiredSessions } from "./auth";
 import { loadConfig, type AppConfig } from "./config";
 import { createDatabase, ensureDatabaseDirectory, runMigrations } from "./db";
@@ -31,6 +35,8 @@ export async function createServerApplication(
     5 * 60 * 60 * 1000,
   );
   sessionCleanupTimer.unref();
+
+  scheduleDailyAtTwoAm(() => recalculateOpenCounts(database));
 
   const warningStore = new WarningStore(config);
   await warningStore.refresh();

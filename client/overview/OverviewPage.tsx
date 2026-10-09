@@ -4,12 +4,17 @@ import type { DailyStat, OpenSummaryPage } from "../../common/types";
 import { fetchJson } from "../shared/fetchJson";
 import { getErrorMessage } from "../shared/getErrorMessage";
 import Modal from "../shared/Modal";
+import { useInterval } from "../shared/useInterval";
 import { useMediaQuery } from "../shared/useMediaQuery";
 import MessageDetails from "./MessageDetails";
 import MessageFilters, { type MessageFilterValues } from "./MessageFilters";
 import MessageTable from "./MessageTable";
 import StatCards from "./StatCards";
 import { getMessageFilters, saveMessageFilters } from "./messageFiltersStore";
+import {
+  getRefreshInterval,
+  saveRefreshInterval,
+} from "./refreshIntervalStore";
 
 /**
  * Overview page: tracking totals, the message list and open events for the selected message.
@@ -23,13 +28,16 @@ export default function OverviewPage() {
   const [filters, setFilters] = useState(() => getMessageFilters());
   const [daily, setDaily] = useState<DailyStat[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [refreshMs, setRefreshMs] = useState(() => getRefreshInterval());
   const isMobile = useMediaQuery("(max-width: 960px)");
 
-  useEffect(() => {
+  const loadDaily = useCallback(() => {
     fetchJson<DailyStat[]>("/api/opens/daily")
       .then(setDaily)
       .catch(() => setDaily([]));
   }, []);
+
+  useEffect(loadDaily, [loadDaily]);
 
   const handleFiltersChange = (next: MessageFilterValues) => {
     setFilters(next);
@@ -72,6 +80,13 @@ export default function OverviewPage() {
     return () => clearTimeout(timer);
   }, [load]);
 
+  useInterval(() => {
+    load();
+    loadDaily();
+  }, refreshMs);
+
+  const selected = result?.items.find((row) => row.msgId === selectedId) ?? null;
+
   return (
     <section className="stack">
       <StatCards
@@ -93,6 +108,11 @@ export default function OverviewPage() {
             setModalOpen(true);
           }}
           onRefresh={load}
+          refreshMs={refreshMs}
+          onRefreshMsChange={(ms) => {
+            setRefreshMs(ms);
+            saveRefreshInterval(ms);
+          }}
           filters={filters}
           onFiltersChange={handleFiltersChange}
           page={page}
@@ -103,6 +123,7 @@ export default function OverviewPage() {
 
         {isMobile ? null : (
           <MessageDetails
+            message={selected}
             msgId={selectedId}
             version={version}
             loadFailed={error !== null}
@@ -113,6 +134,7 @@ export default function OverviewPage() {
       {isMobile && modalOpen ? (
         <Modal onClose={() => setModalOpen(false)}>
           <MessageDetails
+            message={selected}
             msgId={selectedId}
             version={version}
             loadFailed={error !== null}

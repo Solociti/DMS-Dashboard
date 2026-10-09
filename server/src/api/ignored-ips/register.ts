@@ -1,6 +1,7 @@
 import type { RequestHandler, Response, Router } from "express";
 import type { Knex } from "knex";
 
+import { recalculateOpenCounts } from "../opens/counts";
 import {
   InvalidIpError,
   getRequestIp,
@@ -52,6 +53,7 @@ export default function registerIgnoredIps(
         })
         .onConflict("ip")
         .merge();
+      await recalculateOpenCounts(database);
 
       await respond(response, getRequestIp(request));
     } catch (error) {
@@ -64,6 +66,7 @@ export default function registerIgnoredIps(
       await database("ignored_ips")
         .where({ ip: getRouteIp(request.params.ip) })
         .delete();
+      await recalculateOpenCounts(database);
 
       await respond(response, getRequestIp(request));
     } catch (error) {

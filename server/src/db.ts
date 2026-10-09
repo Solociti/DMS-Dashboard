@@ -8,6 +8,7 @@ import * as createMessagesMigration from "../migrations/20261005100000_create_me
 import * as addSentAtToMessagesMigration from "../migrations/20261005110000_add_sent_at_to_messages";
 import * as createUsersAndSessionsMigration from "../migrations/20261005120000_create_users_and_sessions";
 import * as createIgnoredIpsMigration from "../migrations/20261006100000_create_ignored_ips";
+import * as addOpenCountsToMessagesMigration from "../migrations/20261008100000_add_open_counts_to_messages";
 import {
   deleteExpiredSessions,
   ensureDefaultAdmin,
@@ -20,6 +21,7 @@ const migrations = [
   addSentAtToMessagesMigration,
   createUsersAndSessionsMigration,
   createIgnoredIpsMigration,
+  addOpenCountsToMessagesMigration,
 ];
 
 class InlineMigrationSource {

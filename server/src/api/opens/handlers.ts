@@ -17,9 +17,9 @@ interface RawOpenRow {
 }
 
 interface RawSummaryRow {
-  msg_id: string;
-  total_opens: number | string;
-  last_opened: string | null;
+  uid: string;
+  open_count: number | string;
+  last_opened_at: string | null;
   sent_at: string | null;
   subject: string | null;
   sender: string | null;
@@ -46,34 +46,15 @@ export async function getOpenSummaries(
   filters: OpenFilters,
   userEmail: string | null,
 ): Promise<OpenSummaryPage> {
-  const ignoredIps = await getIgnoredIpMatches(database);
-
-  const query = database<RawSummaryRow>("opens")
-    .leftJoin("messages", "messages.uid", "opens.msg_id")
-    .select(
-      "opens.msg_id as msg_id",
-      "messages.subject as subject",
-      "messages.sender as sender",
-      "messages.recipients as recipients",
-      "messages.sent_at as sent_at",
-    )
-    .count<{ total_opens: number | string }>({ total_opens: "*" })
-    .max({ last_opened: "opens.created_at" })
-    .groupBy(
-      "opens.msg_id",
-      "messages.subject",
-      "messages.sender",
-      "messages.recipients",
-      "messages.sent_at",
-    );
-
-  if (ignoredIps.length > 0) {
-    query.where((builder) =>
-      builder
-        .whereNull("opens.ip_address")
-        .orWhereNotIn("opens.ip_address", ignoredIps),
-    );
-  }
+  const query = database<RawSummaryRow>("messages").select(
+    "uid",
+    "open_count",
+    "last_opened_at",
+    "sent_at",
+    "subject",
+    "sender",
+    "recipients",
+  );
 
   if (filters.scope === "mine") {
     const email = (userEmail ?? "").toLowerCase();
@@ -97,8 +78,8 @@ export async function getOpenSummaries(
   const totals = (await database
     .from(query.clone().as("filtered"))
     .count({ total: "*" })
-    .sum({ total_opens: "total_opens" })
-    .max({ last_activity: "last_opened" })
+    .sum({ total_opens: "open_count" })
+    .max({ last_activity: "last_opened_at" })
     .first()) as {
     total: number | string;
     total_opens: number | string | null;
@@ -106,10 +87,13 @@ export async function getOpenSummaries(
   };
 
   if (filters.sort === "sent") {
-    query.orderBy("messages.sent_at", filters.direction);
-    query.orderBy("last_opened", "desc");
+    query.orderBy("sent_at", filters.direction);
+    query.orderBy("last_opened_at", "desc");
   } else {
-    query.orderBy("last_opened", filters.direction);
+    // Never-opened messages sort after opened ones, newest first.
+    query.orderByRaw("last_opened_at is null");
+    query.orderBy("last_opened_at", filters.direction);
+    query.orderBy("created_at", "desc");
   }
 
   query.limit(OPEN_PAGE_SIZE).offset((filters.page - 1) * OPEN_PAGE_SIZE);
@@ -123,9 +107,9 @@ export async function getOpenSummaries(
     page: filters.page,
     pageSize: OPEN_PAGE_SIZE,
     items: rows.map((row) => ({
-      msgId: row.msg_id,
-      totalOpens: Number(row.total_opens),
-      lastOpened: row.last_opened,
+      msgId: row.uid,
+      totalOpens: Number(row.open_count),
+      lastOpened: row.last_opened_at,
       sentAt: row.sent_at,
       subject: row.subject,
       sender: row.sender,
@@ -188,14 +172,16 @@ export async function getDailyStats(database: Knex): Promise<DailyStat[]> {
 export async function getOpenEvents(
   database: Knex,
   msgId: string,
+  includeIgnored = false,
 ): Promise<OpenLogEntry[]> {
   const ignoredIps = await getIgnoredIpMatches(database);
+  const ignoredSet = new Set(ignoredIps);
 
   const query = database<RawOpenRow>("opens")
     .where({ msg_id: msgId })
     .orderBy("created_at", "desc");
 
-  if (ignoredIps.length > 0) {
+  if (!includeIgnored && ignoredIps.length > 0) {
     query.where((builder) =>
       builder.whereNull("ip_address").orWhereNotIn("ip_address", ignoredIps),
     );
@@ -208,5 +194,6 @@ export async function getOpenEvents(
     ipAddress: row.ip_address,
     userAgent: row.user_agent,
     createdAt: row.created_at,
+    ignored: row.ip_address !== null && ignoredSet.has(row.ip_address),
   }));
 }

@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import type { Request } from "express";
 import type { Knex } from "knex";
 
+import { recalculateOpenCounts } from "../opens/counts";
+
 function optionalString(value: unknown, maxLength: number): string | null {
   return typeof value === "string" && value.length > 0
     ? value.slice(0, maxLength)
@@ -62,6 +64,9 @@ export async function saveMessage(
     })
     .onConflict("uid")
     .merge();
+
+  // Opens may have been recorded before the message metadata arrived.
+  await recalculateOpenCounts(database, uid);
 
   return true;
 }
