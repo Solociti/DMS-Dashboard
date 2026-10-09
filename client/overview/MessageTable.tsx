@@ -1,9 +1,17 @@
 import type { OpenSummary } from "../../common/types";
 import { formatDate } from "../shared/formatDate";
 import { MessageFilterValues } from "./MessageFilters";
+import RefreshIntervalSelect from "./RefreshIntervalSelect";
 
 const upArrow = "↑";
 const downArrow = "↓";
+const maxTextLength = 50;
+
+function truncate(text: string): string {
+  return text.length > maxTextLength
+    ? `${text.slice(0, maxTextLength)}…`
+    : text;
+}
 
 interface MessageTableProps {
   /**
@@ -30,6 +38,16 @@ interface MessageTableProps {
    * Called when the refresh button is pressed.
    */
   onRefresh: () => void;
+
+  /**
+   * Current auto refresh interval in milliseconds.
+   */
+  refreshMs: number;
+
+  /**
+   * Called with the newly chosen auto refresh interval.
+   */
+  onRefreshMsChange: (ms: number) => void;
 
   /**
    * Current filter values.
@@ -75,35 +93,42 @@ export default function MessageTable({
   onFiltersChange,
   onPageChange,
   onRefresh,
+  onRefreshMsChange,
   onSelect,
   page,
   pageSize,
+  refreshMs,
   total,
 }: MessageTableProps) {
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
 
-  const MessageRow = ({ row }: { row: OpenSummary }) => (
-    <tr
-      className={row.msgId === selectedId ? "active" : undefined}
-      onClick={() => onSelect(row.msgId)}
-    >
-      <td>
-        <strong>
-          {!row.subject &&
-          !row.sender &&
-          row.recipients.length === 0 &&
-          !row.sentAt
-            ? row.msgId
-            : (row.subject ?? "(no subject)")}
-        </strong>
-      </td>
-      <td>{row.sender ?? "-"}</td>
-      <td>{row.recipients.join(", ") || "-"}</td>
-      <td>{row.sentAt ? formatDate(row.sentAt) : "-"}</td>
-      <td>{row.totalOpens}</td>
-      <td>{formatDate(row.lastOpened)}</td>
-    </tr>
-  );
+  const MessageRow = ({ row }: { row: OpenSummary }) => {
+    const title =
+      !row.subject && !row.sender && row.recipients.length === 0 && !row.sentAt
+        ? row.msgId
+        : (row.subject ?? "(no subject)");
+    const recipients = row.recipients.join(", ");
+
+    return (
+      <tr
+        className={row.msgId === selectedId ? "active" : undefined}
+        onClick={() => onSelect(row.msgId)}
+      >
+        <td title={title}>
+          <strong>{truncate(title)}</strong>
+        </td>
+        <td title={row.sender ?? undefined}>
+          {row.sender ? truncate(row.sender) : "-"}
+        </td>
+        <td title={recipients || undefined}>
+          {recipients ? truncate(recipients) : "-"}
+        </td>
+        <td>{row.sentAt ? formatDate(row.sentAt) : "-"}</td>
+        <td>{row.totalOpens}</td>
+        <td>{formatDate(row.lastOpened)}</td>
+      </tr>
+    );
+  };
 
   const Message = ({ text }: { text: string }) => (
     <tr>
@@ -115,9 +140,12 @@ export default function MessageTable({
     <section className="panel inset">
       <div className="panel-heading">
         <h2>Messages</h2>
-        <button type="button" onClick={onRefresh}>
-          Refresh
-        </button>
+        <div className="filter-row">
+          <RefreshIntervalSelect value={refreshMs} onChange={onRefreshMsChange} />
+          <button type="button" onClick={onRefresh}>
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div className="table-wrap">

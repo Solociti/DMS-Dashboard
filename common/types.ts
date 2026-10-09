@@ -33,6 +33,8 @@ export interface OpenLogEntry {
   ipAddress: string | null;
   userAgent: string | null;
   createdAt: string;
+  /** True when the hit came from an ignored IP. */
+  ignored: boolean;
 }
 
 export interface LogFileInfo {

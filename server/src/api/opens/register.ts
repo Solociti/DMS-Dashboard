@@ -41,7 +41,9 @@ export default function registerOpens(
         return;
       }
 
-      response.json(await getOpenEvents(database, msgId));
+      response.json(
+        await getOpenEvents(database, msgId, request.query.includeIgnored === "1"),
+      );
     } catch (error) {
       next(error);
     }

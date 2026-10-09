@@ -1,9 +1,14 @@
+// SQLite timestamps are UTC but have no zone suffix; without one, Date parses them as local time.
+const sqliteTimestamp = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/;
+
 export function formatDate(value: string | null): string {
   if (!value) {
     return "Never";
   }
 
-  const date = new Date(value);
+  const date = new Date(
+    sqliteTimestamp.test(value) ? `${value.replace(" ", "T")}Z` : value,
+  );
 
   if (!Number.isFinite(date.getTime())) {
     return "Invalid date";

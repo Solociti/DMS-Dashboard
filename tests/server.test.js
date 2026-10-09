@@ -676,19 +676,24 @@ test("opens API filters, sorts and hides ignored IPs", async () => {
     await database("messages").insert([
       { uid: "a", subject: "Invoice", sender: "admin@example.com", recipients: "[]", sent_at: "2026-10-01T00:00:00.000Z" },
       { uid: "b", subject: "Hello", sender: "other@example.com", recipients: "[]", sent_at: "2026-10-02T00:00:00.000Z" },
+      { uid: "c", subject: "Unopened", sender: "admin@example.com", recipients: "[]", sent_at: "2026-10-03T00:00:00.000Z" },
     ]);
-    await database("opens").insert([
-      { msg_id: "a", ip_address: "203.0.113.10" },
-      { msg_id: "b", ip_address: "198.51.100.7" },
-    ]);
+    for (const [id, ip] of [["a", "203.0.113.10"], ["b", "198.51.100.7"]]) {
+      await fetch(`${baseUrl}/open/${id}.png`, { headers: { "x-forwarded-for": ip } });
+    }
+    await waitFor(async () => (await database("messages").where("open_count", ">", 0)).length === 2);
 
     const list = async (query) =>
       (await (await authFetch(`${baseUrl}/api/opens?${query}`, cookie)).json()).items.map((row) => row.msgId);
 
-    assert.deepEqual(await list("sort=sent&dir=asc"), ["a", "b"]);
-    assert.deepEqual(await list("sort=sent&dir=desc"), ["b", "a"]);
-    assert.deepEqual(await list("scope=mine"), ["a"]);
+    assert.deepEqual(await list("sort=sent&dir=asc"), ["a", "b", "c"]);
+    assert.deepEqual(await list("sort=sent&dir=desc"), ["c", "b", "a"]);
+    assert.deepEqual(await list("scope=mine&sort=sent&dir=asc"), ["a", "c"]);
     assert.deepEqual(await list("q=hello"), ["b"]);
+
+    const unopened = (await (await authFetch(`${baseUrl}/api/opens?q=Unopened`, cookie)).json()).items[0];
+    assert.equal(unopened.totalOpens, 0);
+    assert.equal(unopened.lastOpened, null);
 
     const invalid = await authFetch(`${baseUrl}/api/ignored-ips`, cookie, {
       method: "POST",
@@ -705,7 +710,15 @@ test("opens API filters, sorts and hides ignored IPs", async () => {
       })
     ).json();
     assert.deepEqual(added.ips, [{ ip: "203.0.113.10", note: "Home" }]);
-    assert.deepEqual(await list(""), ["b"]);
+    assert.deepEqual((await list("sort=sent&dir=asc")).length, 3);
+    const counts = (await (await authFetch(`${baseUrl}/api/opens?scope=all`, cookie)).json()).totalOpens;
+    assert.equal(counts, 1);
+
+    const hidden = await (await authFetch(`${baseUrl}/api/opens/a`, cookie)).json();
+    assert.equal(hidden.length, 0);
+    const shown = await (await authFetch(`${baseUrl}/api/opens/a?includeIgnored=1`, cookie)).json();
+    assert.equal(shown.length, 1);
+    assert.equal(shown[0].ignored, true);
 
     const removed = await (
       await authFetch(`${baseUrl}/api/ignored-ips/203.0.113.10`, cookie, {
@@ -713,7 +726,7 @@ test("opens API filters, sorts and hides ignored IPs", async () => {
       })
     ).json();
     assert.deepEqual(removed.ips, []);
-    assert.equal((await list("")).length, 2);
+    assert.equal((await authFetch(`${baseUrl}/api/opens`, cookie).then((r) => r.json())).totalOpens, 2);
   } finally {
     await new Promise((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

@@ -280,6 +280,43 @@ tbody tr:hover,
   padding: 0.85rem 1rem;
   text-align: left;
 }
+.message-info {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(84, 125, 168, 0.2);
+  border-radius: 16px;
+  background: rgba(9, 19, 31, 0.55);
+}
+.message-info-subject {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+.message-info-fields {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.4rem 1rem;
+  margin: 0;
+}
+.message-info-fields dt {
+  color: #9ab3cc;
+}
+.message-info-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.message-info-id {
+  margin: 0.75rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(84, 125, 168, 0.2);
+  color: #9ab3cc;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.message-info + button {
+  margin-bottom: 1rem;
+}
 .warning-panel {
   border-color: rgba(255, 179, 71, 0.4);
   background: rgba(61, 38, 8, 0.45);

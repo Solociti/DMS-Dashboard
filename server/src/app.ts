@@ -4,6 +4,7 @@ import path from "node:path";
 
 import registerApi from "./api/register";
 import { createApiRateLimiters } from "./api/rate-limits";
+import { recalculateOpenCounts } from "./api/opens/counts";
 import { getAuthenticatedUser } from "./auth";
 import type { AppConfig } from "./config";
 import type { LogRegistry } from "./logs";
@@ -101,6 +102,7 @@ export function createApp(
             ip_address: getClientIp(request),
             user_agent: request.header("user-agent") || null,
           })
+          .then(() => recalculateOpenCounts(database, msgId))
           .catch((error: unknown) => {
             console.error(error instanceof Error ? error.message : error);
           });
