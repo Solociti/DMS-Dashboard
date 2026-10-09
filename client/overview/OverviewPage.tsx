@@ -132,8 +132,9 @@ export default function OverviewPage() {
       </div>
 
       {isMobile && modalOpen ? (
-        <Modal onClose={() => setModalOpen(false)}>
+        <Modal title="Open Details" onClose={() => setModalOpen(false)}>
           <MessageDetails
+            hideHeading
             message={selected}
             msgId={selectedId}
             version={version}

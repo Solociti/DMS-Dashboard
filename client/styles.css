@@ -31,15 +31,34 @@ body {
   max-width: 560px;
   max-height: 85vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-radius: 24px;
   background: #0b1826;
   border: 1px solid rgba(84, 125, 168, 0.25);
   padding: 1rem;
 }
+.modal:focus {
+  outline: none;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.modal-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
 .modal-close {
-  display: block;
-  margin: 0 0 0.75rem auto;
   padding: 0.25rem 0.9rem;
+}
+.modal .panel {
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
 }
 body {
   margin: 0;
@@ -189,9 +208,10 @@ button:hover {
 .inset {
   background: rgba(9, 19, 31, 0.55);
 }
+
 .stat-card {
   border-radius: 20px;
-  padding: 1.25rem;
+  padding: 1rem;
 }
 .stat-card h2,
 .panel-heading h2 {
@@ -200,7 +220,21 @@ button:hover {
 }
 .stat-card p {
   font-size: 1.8rem;
-  margin: 0.4rem 0 0;
+  margin: 0.3rem 0 0;
+}
+.stat-card-text {
+  position: relative;
+  top: -5px;
+  width: fit-content;
+  height: 100%;
+
+  border-radius: 8px;
+
+  background: linear-gradient(
+    to right,
+    rgba(12, 27, 44, 0.7),
+    rgba(12, 27, 44, 0)
+  );
 }
 
 .line-chart-container {
