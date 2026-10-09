@@ -138,7 +138,7 @@ export default function MessageTable({
 
   const Message = ({ text }: { text: string }) => (
     <tr>
-      <td colSpan={6}>{text}</td>
+      <td colSpan={5}>{text}</td>
     </tr>
   );
 

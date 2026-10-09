@@ -5,7 +5,7 @@ Installation, configuration, and development instructions for DMS Dashboard.
 ## Contents
 
 - [Requirements](#requirements)
-- [Production Docker Compose](#production-docker-compose)
+- [Example Docker Compose](#example-docker-compose)
 - [Environment](#environment)
 - [Dashboard accounts](#dashboard-accounts)
 - [Mailserver Rspamd setup](#mailserver-rspamd-setup)
@@ -139,7 +139,7 @@ pnpm run dev
 
 This builds a development container (via `docker-compose.dev.yml`) that installs dependencies, bind-mounts the repo, and runs the client bundler (esbuild watch) and server (`tsx watch`) with live reload. The dashboard is exposed on `http://localhost:3000`.
 
-SQLite data persists in the `dev-data` Docker volume, and `./dms-root/` on the host is mounted to `/dms`. Replace it with your Docker Mailserver config path, or leave it empty to see the dashboard's warning state. Environment values come from `example.env`; copy it to `.env` and adjust as needed, or edit `docker-compose.dev.yml` to point at your own env file.
+SQLite data persists in the `dev-data` Docker volume, and `./dms-root/` on the host is mounted to `/dms`. Replace it with your Docker Mailserver config path, or leave it empty to see the dashboard's warning state. Environment values come from `example.env`.
 
 ### Demo data
 
