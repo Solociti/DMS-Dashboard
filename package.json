@@ -12,6 +12,7 @@
     "dev:container": "concurrently -n client,server -c blue,green \"npm:dev:client\" \"npm:dev:server\"",
     "dev:client": "node ./scripts/dev-client.mjs",
     "dev:server": "tsx watch server/src/index.ts",
+    "seed": "tsx server/src/seed.ts",
     "dev:fake": "node ./scripts/fake-mail.mjs"
   },
   "keywords": [

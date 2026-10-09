@@ -1,128 +1,64 @@
 # DMS Dashboard
 
-Email tracking dashboard for Docker Mailserver with:
+Know when your email gets read. DMS Dashboard adds open tracking and a clean web dashboard to your self-hosted [Docker Mailserver](https://docker-mailserver.github.io/docker-mailserver/latest/).
 
-- Node.js + Express + TypeScript API
-- Knex + SQLite open-event storage
-- React dashboard (React Router, lazy-loaded pages) with a separate small login bundle, served from `public/dist/`
-- Rspamd Lua postfilter for tracking-pixel injection
-- Release workflow that builds and pushes a GHCR image
+> The majority of this project is AI-assisted code with human oversight.
 
-## Note
+## Screenshots
 
-This project is AI-assisted.
+### Desktop
 
-## Environment
+<!-- Add desktop screenshots to public/images/screenshots/ -->
 
-Copy `example.env` and adjust values as needed:
+![Desktop overview](public/images/screenshots/desktop-overview.png)
 
-- `PORT`: HTTP port for the dashboard server
-- `DATABASE_PATH`: persistent SQLite database path (default `/data/tracker.sqlite`)
-- `DMS_ROOT`: mounted Docker Mailserver path (default `/dms`)
-- `RSPAMD_DIR`: Rspamd directory where the dashboard writes `rspamd.local.lua` (default `${DMS_ROOT}/rspamd`)
-- `TRUST_PROXY`: set to `true`, a hop count, or a proxy definition only when the app sits behind your own trusted proxy
-- `TRACKING_BASE_URL`: externally reachable dashboard origin used by the Lua filter; when unset, the filter is not installed and the dashboard shows a warning
-- The dashboard stores excluded sender addresses in `tracking-blacklist.txt` beside the generated Rspamd filter.
-- `LOG_FILES`: comma-separated log aliases and paths, for example `rspamd:/dms/logs/rspamd.log,mail:/dms/logs/mail.log`
+### Mobile
 
-## Dashboard accounts
+<!-- Add mobile screenshots to public/images/screenshots/ -->
 
-When the database has no users, the dashboard creates a temporary admin account on startup:
+![Mobile overview](public/images/screenshots/mobile-overview.png)
 
-- Email: `admin@example.com`
-- Temporary password: `changeme123`
+## Features
 
-The first login requires setting a new password. Passwords must be 12 to 128 characters. All users are administrators: the Users view changes the email or password of any listed account, and leaving the new-password field blank keeps the current password. A password set for another user must be changed by that user at their next login. Changing a password signs out that user's other sessions.
+**Tracking**
 
-For tracking mail sent through authenticated SMTP accounts, Docker Mailserver must run Rspamd checks for authenticated users. Set `RSPAMD_CHECK_AUTHENTICATED=1` on the Docker Mailserver container; its default is `0`, which skips those messages and prevents the tracking postfilter from running. This enables the default Rspamd checks for authenticated mail, not only the tracking filter. The tracking filter only modifies messages with an authenticated user, so ordinary inbound mail is not changed.
+- Automatic tracking-pixel injection for outbound mail via an Rspamd Lua filter
+- Only authenticated (sent) mail is modified; inbound mail is never touched
+- Per-message open counts and last-opened time
 
-## Mailserver Rspamd setup
+**Dashboard**
 
-The tracking filter is a Rspamd Lua script loaded directly as `/etc/rspamd/rspamd.local.lua`, so it must be enabled and bind-mounted into your Docker Mailserver container.
+- Overview with daily sent and opened charts and summary stat cards
+- Filterable, sortable message table with per-message open details
+- Configurable auto-refresh interval
+- Responsive layout for desktop and mobile
 
-### 1. Enable Rspamd
+**Control**
 
-In your DMS environment:
+- Excluded senders list to skip tracking for chosen addresses (no Rspamd restart needed)
+- Ignored IPs so your own opens do not count, with a one-click "ignore my IP"
+- Built-in log viewer for Rspamd and mail logs
+- Health warnings when the filter or tracking URL is not configured
 
-```
-ENABLE_RSPAMD=1
-```
+**Security and operations**
 
-If you currently have the legacy DKIM/DMARC/Amavis stack enabled, DMS recommends using Rspamd in their place rather than running both stacks for the same functions.
+- Login with enforced password change on first use
+- Multi-user management; changing a password signs out other sessions
+- Rate-limited API
+- Single Docker image with SQLite storage and no external database
 
-DMS defaults `RSPAMD_CHECK_AUTHENTICATED=0`, meaning authenticated/outbound mail normally bypasses Rspamd's checks. Since the tracking filter only modifies authenticated (outbound) mail, set:
+## Quick start
 
-```
-RSPAMD_CHECK_AUTHENTICATED=1
-```
+1. Add the dashboard container next to your Docker Mailserver.
+2. Enable Rspamd and mount the generated filter into the mailserver.
+3. Set `TRACKING_BASE_URL`, then log in with the temporary admin account.
 
-That also means authenticated outbound messages go through Rspamd's normal checks, not only the tracking filter.
+Full instructions and a production Docker Compose example are in the [Setup Guide](SETUP.md).
 
-### 2. Let the dashboard write the Lua script
+## Tech stack
 
-With `RSPAMD_DIR` and `TRACKING_BASE_URL` configured (see above), the dashboard writes the substituted filter to `${RSPAMD_DIR}/rspamd.local.lua` on the host path backing `DMS_ROOT`, for example `docker-data/dms/config/rspamd/rspamd.local.lua`.
+Node.js, Express, TypeScript, Knex + SQLite, React 19 with React Router, esbuild, and an Rspamd Lua postfilter. Releases are built and published to GHCR.
 
-### 3. Mount the Lua file into the DMS container
+## License
 
-DMS's normal config volume handles `rspamd/override.d`, but a custom `rspamd.local.lua` is easiest to bind-mount explicitly. The Rspamd loader supports `/etc/rspamd/rspamd.local.lua`. Add to the `mailserver` service:
-
-```yaml
-volumes:
-  - ./docker-data/dms/config/:/tmp/docker-mailserver/
-  - ./docker-data/dms/config/rspamd/rspamd.local.lua:/etc/rspamd/rspamd.local.lua:ro
-  - ./docker-data/dms/config/rspamd/tracking-blacklist.txt:/etc/rspamd/tracking-blacklist.txt:ro
-```
-
-The dashboard creates the blacklist file when it installs the filter. The Lua filter reads it for each authenticated outbound message, so changes made on the Excluded senders page take effect without restarting Rspamd.
-
-## Development
-
-```bash
-corepack pnpm install
-corepack pnpm run typecheck
-corepack pnpm test
-```
-
-### Dev container
-
-`pnpm run dev` builds a development container (via `docker-compose.dev.yml`) that installs
-dependencies, bind-mounts the repo, and runs the client bundler and server together with
-live reload:
-
-```bash
-pnpm run dev
-```
-
-This runs esbuild in watch mode for the client (`public/dist/`) and `tsx watch` for the
-server, both inside the container, and exposes the dashboard on `http://localhost:3000`.
-SQLite data persists in the `dev-data` Docker volume, and `./dms-root/` on the host is
-mounted to `/dms` — replace it with your Docker Mailserver config path, or leave it empty
-to see the dashboard's warning state. Environment values come from `example.env`; copy it
-to `.env` and adjust as needed, then add `--env-file .env` overrides or edit
-`docker-compose.dev.yml` to point at your own env file.
-
-## Build
-
-```bash
-corepack pnpm run build
-```
-
-This produces:
-
-- `public/dist/` for the client SPA
-- `build/server/index.js` for the bundled server entrypoint
-
-## Docker
-
-Build the production image with:
-
-```bash
-docker build -f server/Dockerfile -t dms-dashboard .
-```
-
-At runtime, mount:
-
-- Docker Mailserver config at `/dms`
-- Persistent data at `/data`
-
-If the configured `RSPAMD_DIR` is available and `TRACKING_BASE_URL` is set, the bundled filter is installed at `/dms/rspamd/rspamd.local.lua` by default. The dashboard substitutes the configured URL into the Lua script and replaces the existing filter whenever its contents differ. If the required path or tracking URL is unavailable, the dashboard shows a warning and lets you re-run the check after you fix the environment. See [Mailserver Rspamd setup](#mailserver-rspamd-setup) for the corresponding Docker Mailserver configuration.
+See [LICENSE](LICENSE).
