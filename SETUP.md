@@ -146,10 +146,10 @@ SQLite data persists in the `dev-data` Docker volume, and `./dms-root/` on the h
 Reset the messages and opens tables and seed roughly 90 days of randomized sample mail:
 
 ```bash
-docker compose -f docker-compose.dev.yml exec dashboard pnpm run seed
+pnpm run seed
 ```
 
-Or run `pnpm run seed` directly with `DATABASE_PATH` pointing at a local SQLite file. Some days have no emails and fewer days have no opens. The seed lives in `server/seeds/` and **deletes all existing messages and opens**, so do not run it against production data.
+This execs the seed inside the dev container, so `pnpm run dev` must already be running. Some days have no emails and fewer days have no opens. The seed lives in `server/seeds/` and **deletes all existing messages and opens**, so do not run it against production data.
 
 To fake live Rspamd reports and pixel opens against a running dev dashboard, use `pnpm run dev:fake`.
 
