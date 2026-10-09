@@ -26,6 +26,11 @@ interface MessageDetailsProps {
    * True when the overview itself failed to load.
    */
   loadFailed: boolean;
+
+  /**
+   * Omit the "Open Details" heading when the parent already shows one.
+   */
+  hideHeading?: boolean;
 }
 
 /**
@@ -38,6 +43,7 @@ export default function MessageDetails({
   msgId,
   version,
   loadFailed,
+  hideHeading = false,
 }: MessageDetailsProps) {
   const [entries, setEntries] = useState<OpenLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +90,7 @@ export default function MessageDetails({
   return (
     <section className="panel inset">
       <div className="panel-heading">
-        <h2>Open Details</h2>
+        {hideHeading ? null : <h2>Open Details</h2>}
         <p>{title}</p>
       </div>
 

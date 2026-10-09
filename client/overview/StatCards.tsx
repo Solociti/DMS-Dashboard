@@ -45,8 +45,10 @@ export default function StatCards({
           />
         </div>
 
-        <h2>Tracked messages</h2>
-        <p>{totalMessages}</p>
+        <div className="stat-card-text">
+          <h2>Tracked messages</h2>
+          <p>{totalMessages}</p>
+        </div>
       </article>
 
       <article className="stat-card stat-card-opens">
@@ -57,8 +59,10 @@ export default function StatCards({
           />
         </div>
 
-        <h2>Total opens</h2>
-        <p>{totalOpens}</p>
+        <div className="stat-card-text">
+          <h2>Total opens</h2>
+          <p>{totalOpens}</p>
+        </div>
       </article>
 
       <article className="stat-card">

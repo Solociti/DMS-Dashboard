@@ -5,12 +5,19 @@ import RefreshIntervalSelect from "./RefreshIntervalSelect";
 
 const upArrow = "↑";
 const downArrow = "↓";
-const maxTextLength = 50;
+const defaultTextLength = 50;
 
-function truncate(text: string): string {
-  return text.length > maxTextLength
-    ? `${text.slice(0, maxTextLength)}…`
-    : text;
+/**
+ * Truncates a string to the specified length, adding an ellipsis if necessary.
+ *
+ * @param text
+ * @param length
+ * @returns
+ */
+function truncate(text: string, length?: number): string {
+  const len = typeof length === "number" && length ? length : defaultTextLength;
+
+  return text.length > len ? `${text.slice(0, len)}…` : text;
 }
 
 interface MessageTableProps {
@@ -117,11 +124,10 @@ export default function MessageTable({
         <td title={title}>
           <strong>{truncate(title)}</strong>
         </td>
-        <td title={row.sender ?? undefined}>
-          {row.sender ? truncate(row.sender) : "-"}
-        </td>
-        <td title={recipients || undefined}>
-          {recipients ? truncate(recipients) : "-"}
+        <td>
+          <small>From: {row.sender ? truncate(row.sender, 25) : "-"}</small>
+          <br />
+          <small>To: {recipients ? truncate(recipients, 25) : "-"}</small>
         </td>
         <td>{row.sentAt ? formatDate(row.sentAt) : "-"}</td>
         <td>{row.totalOpens}</td>
@@ -141,7 +147,10 @@ export default function MessageTable({
       <div className="panel-heading">
         <h2>Messages</h2>
         <div className="filter-row">
-          <RefreshIntervalSelect value={refreshMs} onChange={onRefreshMsChange} />
+          <RefreshIntervalSelect
+            value={refreshMs}
+            onChange={onRefreshMsChange}
+          />
           <button type="button" onClick={onRefresh}>
             Refresh
           </button>
@@ -153,8 +162,7 @@ export default function MessageTable({
           <thead>
             <tr>
               <th className="text-nowrap">Message</th>
-              <th className="text-nowrap">From</th>
-              <th className="text-nowrap">To</th>
+              <th className="text-nowrap"></th>
               <th
                 className="text-nowrap cursor-pointer"
                 onClick={() => {
