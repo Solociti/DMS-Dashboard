@@ -43,6 +43,8 @@ export default function MessageInfo({ message }: MessageInfoProps) {
         <dd>{formatDate(message.lastOpened)}</dd>
       </dl>
 
+      <hr />
+
       <p className="message-info-id">
         <span title="Client Message ID">{message.messageId}</span>{" "}
         <span title="Transaction ID">{message.uid}</span>

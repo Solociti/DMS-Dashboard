@@ -28,11 +28,20 @@ export interface DailyStat {
   opens: number;
 }
 
+export interface UserAgentDevice {
+  browser: string;
+  os: string;
+  device: string;
+}
+
 export interface OpenLogEntry {
   id: number;
   msgId: string;
   ipAddress: string | null;
+
   userAgent: string | null;
+  userAgentDevice: UserAgentDevice;
+
   createdAt: string;
   /** True when the hit came from an ignored IP. */
   ignored: boolean;

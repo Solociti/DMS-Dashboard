@@ -7,6 +7,7 @@ import type {
 } from "../../../../common/types";
 import { getIgnoredIpMatches } from "../ignored-ips/helpers";
 import { OPEN_PAGE_SIZE, type OpenFilters } from "./helpers";
+import { UAParser } from "ua-parser-js";
 
 interface RawOpenRow {
   id: number;
@@ -192,12 +193,50 @@ export async function getOpenEvents(
   }
 
   const rows = await query;
-  return rows.map((row) => ({
-    id: row.id,
-    msgId: row.msg_id,
-    ipAddress: row.ip_address,
-    userAgent: row.user_agent,
-    createdAt: row.created_at,
-    ignored: row.ip_address !== null && ignoredSet.has(row.ip_address),
-  }));
+  return rows.map((row) => {
+    const ua = new UAParser(row.user_agent ?? "");
+
+    const device = ua.getDevice();
+    const os = ua.getOS();
+    const browser = ua.getBrowser();
+
+    return {
+      id: row.id,
+      msgId: row.msg_id,
+      ipAddress: row.ip_address,
+      userAgent: row.user_agent,
+      userAgentDevice: {
+        browser: `${browser.name ?? ""} ${browser.version ?? ""}`.trim(),
+        os: `${os.name ?? ""} ${os.version ?? ""}`.trim(),
+        device: `${device.model ?? ""} ${device.vendor ?? ""}`.trim(),
+      },
+      createdAt: row.created_at,
+      ignored: row.ip_address !== null && ignoredSet.has(row.ip_address),
+    };
+  });
+}
+
+/**
+ * Count the number of open events for a given message, distinguishing between visible and total events.
+ *
+ * @param database
+ * @param msgId
+ * @returns
+ */
+export async function countOpenEvents(
+  database: Knex,
+  msgId: string,
+): Promise<{ visible: number; total: number }> {
+  const ignoredIps = await getIgnoredIpMatches(database);
+  const ignoredSet = new Set(ignoredIps);
+
+  const query = database<RawOpenRow>("opens").where({ msg_id: msgId });
+
+  const rows = await query;
+  const total = rows.length;
+  const visible = rows.filter(
+    (row) => row.ip_address === null || !ignoredSet.has(row.ip_address),
+  ).length;
+
+  return { visible, total };
 }
