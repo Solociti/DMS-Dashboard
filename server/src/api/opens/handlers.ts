@@ -18,6 +18,7 @@ interface RawOpenRow {
 
 interface RawSummaryRow {
   uid: string;
+  message_id: string;
   open_count: number | string;
   last_opened_at: string | null;
   sent_at: string | null;
@@ -48,6 +49,7 @@ export async function getOpenSummaries(
 ): Promise<OpenSummaryPage> {
   const query = database<RawSummaryRow>("messages").select(
     "uid",
+    "message_id",
     "open_count",
     "last_opened_at",
     "sent_at",
@@ -69,7 +71,8 @@ export async function getOpenSummaries(
     const pattern = `%${filters.query.replace(/[\\%_]/g, "\\$&")}%`;
     query.where((builder) =>
       builder
-        .whereRaw("messages.subject like ? escape '\\'", [pattern])
+        .whereRaw("messages.message_id like ? escape '\\'", [pattern])
+        .orWhereRaw("messages.subject like ? escape '\\'", [pattern])
         .orWhereRaw("messages.sender like ? escape '\\'", [pattern])
         .orWhereRaw("messages.recipients like ? escape '\\'", [pattern]),
     );
@@ -107,7 +110,8 @@ export async function getOpenSummaries(
     page: filters.page,
     pageSize: OPEN_PAGE_SIZE,
     items: rows.map((row) => ({
-      msgId: row.uid,
+      uid: row.uid,
+      messageId: row.message_id,
       totalOpens: Number(row.open_count),
       lastOpened: row.last_opened_at,
       sentAt: row.sent_at,

@@ -1,5 +1,6 @@
 export interface OpenSummary {
-  msgId: string;
+  uid: string;
+  messageId: string;
   totalOpens: number;
   lastOpened: string | null;
   sentAt: string | null;
