@@ -60,6 +60,19 @@ export interface LogFileResponse {
   content: string;
 }
 
+export interface LogSearchHit {
+  file: string;
+  line: string;
+}
+
+export interface LogSearchResponse {
+  terms: string[];
+  hits: LogSearchHit[];
+  /** True when the hit or scan limit cut the search short. */
+  truncated: boolean;
+  filesScanned: number;
+}
+
 export interface DashboardWarning {
   code: string;
   title: string;

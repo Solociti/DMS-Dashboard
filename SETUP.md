@@ -63,7 +63,7 @@ DMS_ROOT=/dms
 RSPAMD_DIR=/dms/config/rspamd
 TRACKING_BASE_URL=https://track.example.com
 TRUST_PROXY=true
-LOG_FILES=rspamd:/dms/logs/rspamd.log,mail:/dms/logs/mail.log
+LOG_DIR=/dms/logs
 ```
 
 ## Environment
@@ -76,7 +76,7 @@ Copy `example.env` and adjust values as needed:
 - `RSPAMD_DIR`: Rspamd directory where the dashboard writes `rspamd.local.lua` (default `${DMS_ROOT}/rspamd`)
 - `TRUST_PROXY`: set to `true`, a hop count, or a proxy definition only when the app sits behind your own trusted proxy
 - `TRACKING_BASE_URL`: externally reachable dashboard origin used by the Lua filter; when unset, the filter is not installed and the dashboard shows a warning
-- `LOG_FILES`: comma-separated log aliases and paths, for example `rspamd:/dms/logs/rspamd.log,mail:/dms/logs/mail.log`
+- `LOG_DIR`: directory of log files (including `.gz`) shown on the logs page and searched for message logs, for example `/dms/logs`
 
 The dashboard stores excluded sender addresses in `tracking-blacklist.txt` beside the generated Rspamd filter.
 

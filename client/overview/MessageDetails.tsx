@@ -5,6 +5,7 @@ import { fetchJson } from "../shared/fetchJson";
 import { formatDate } from "../shared/formatDate";
 import { getErrorMessage } from "../shared/getErrorMessage";
 import MessageInfo from "./MessageInfo";
+import MessageLogsModal from "./MessageLogsModal";
 
 interface MessageDetailsProps {
   /**
@@ -48,6 +49,7 @@ export default function MessageDetails({
   const [entries, setEntries] = useState<OpenLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showIgnored, setShowIgnored] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
   const [counts, setCounts] = useState({ total: 0, visible: 0 });
 
   useEffect(() => {
@@ -108,6 +110,11 @@ export default function MessageDetails({
               onClick={() => setShowIgnored((value) => !value)}
             >
               {showIgnored ? "Hide ignored hits" : "Show ignored hits"}
+            </button>
+          ) : null}
+          {message ? (
+            <button type="button" onClick={() => setShowLogs(true)}>
+              Show logs
             </button>
           ) : null}
         </div>
@@ -178,6 +185,10 @@ export default function MessageDetails({
             </li>
           ))}
       </ul>
+
+      {showLogs && message ? (
+        <MessageLogsModal message={message} onClose={() => setShowLogs(false)} />
+      ) : null}
     </section>
   );
 }

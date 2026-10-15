@@ -46,7 +46,7 @@ export default function registerApi(
   router.use("/ignored-ips", ignoredIpRoutes);
 
   const logRoutes = express.Router();
-  registerLogs(logRoutes, dependencies.logRegistry, limiters.general);
+  registerLogs(logRoutes, dependencies.config.logDir, limiters.general);
   router.use("/logs", logRoutes);
 
   const warningRoutes = express.Router();
