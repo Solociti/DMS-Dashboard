@@ -1,7 +1,11 @@
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
+import zlib from "node:zlib";
 import type { Knex } from "knex";
 
 const DAYS = 90;
+const GZIP_LOG_AFTER_DAYS = 45;
 const NO_EMAIL_DAY_CHANCE = 0.2;
 const NO_OPEN_DAY_CHANCE = 0.08;
 const OPEN_CHANCE = 0.6;
@@ -55,7 +59,8 @@ export async function seed(knex: Knex): Promise<void> {
   const now = new Date();
   const messages: Record<string, unknown>[] = [];
   const opens: Record<string, unknown>[] = [];
-
+  const recentLogLines: string[] = [];
+  const oldLogLines: string[] = [];
   for (let daysAgo = DAYS - 1; daysAgo >= 0; daysAgo--) {
     if (Math.random() < NO_EMAIL_DAY_CHANCE) {
       continue;
@@ -113,6 +118,15 @@ export async function seed(knex: Knex): Promise<void> {
           ? sqliteTimestamp(openTimes[openTimes.length - 1])
           : null,
       });
+
+      const queueId = crypto.randomBytes(6).toString("hex").toUpperCase().slice(0, 12);
+      const stamp = `${sentAt.toISOString().slice(0, 19)}+00:00`;
+      const lines = [
+        `${stamp} mail postfix/sender-cleanup/cleanup[${between(1000, 9999)}]: ${queueId}: message-id=<${uid}@brightpathcleaning.example>`,
+        `${stamp} mail postfix/qmgr[${between(100, 999)}]: ${queueId}: from=<${sender}>, size=${between(2000, 50000)}, nrcpt=1 (queue active)`,
+        `${stamp} mail postfix/smtp[${between(1000, 9999)}]: ${queueId}: to=<${recipient}>, relay=mx.${recipient.split("@")[1]}[${randomIp()}]:25, delay=0.4, status=sent (250 2.0.0 OK ${uid})`,
+      ];
+      (daysAgo >= GZIP_LOG_AFTER_DAYS ? oldLogLines : recentLogLines).push(...lines);
     }
   }
 
@@ -124,4 +138,11 @@ export async function seed(knex: Knex): Promise<void> {
   });
 
   console.log(`Seeded ${messages.length} messages and ${opens.length} opens.`);
+
+  // Dev containers mount DMS_ROOT at /dms; older mail is rotated into a .gz file.
+  const logDir = process.env.LOG_DIR ?? path.join(process.env.DMS_ROOT ?? "/dms", "logs");
+  await fs.mkdir(logDir, { recursive: true });
+  await fs.writeFile(path.join(logDir, "mail.log"), `${recentLogLines.join("\n")}\n`);
+  await fs.writeFile(path.join(logDir, "mail.log.1.gz"), zlib.gzipSync(`${oldLogLines.join("\n")}\n`));
+  console.log(`Seeded mail logs in ${logDir}.`);
 }

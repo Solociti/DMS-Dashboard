@@ -66,9 +66,9 @@ export default function OverviewPage() {
         setResult(next);
         setError(null);
         setSelectedId((current) =>
-          current && next.items.some((row) => row.msgId === current)
+          current && next.items.some((row) => row.uid === current)
             ? current
-            : (next.items[0]?.msgId ?? null),
+            : (next.items[0]?.uid ?? null),
         );
         setVersion((value) => value + 1);
       })
@@ -85,7 +85,7 @@ export default function OverviewPage() {
     loadDaily();
   }, refreshMs);
 
-  const selected = result?.items.find((row) => row.msgId === selectedId) ?? null;
+  const selected = result?.items.find((row) => row.uid === selectedId) ?? null;
 
   return (
     <section className="stack">

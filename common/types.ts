@@ -1,5 +1,6 @@
 export interface OpenSummary {
-  msgId: string;
+  uid: string;
+  messageId: string;
   totalOpens: number;
   lastOpened: string | null;
   sentAt: string | null;
@@ -27,11 +28,20 @@ export interface DailyStat {
   opens: number;
 }
 
+export interface UserAgentDevice {
+  browser: string;
+  os: string;
+  device: string;
+}
+
 export interface OpenLogEntry {
   id: number;
   msgId: string;
   ipAddress: string | null;
+
   userAgent: string | null;
+  userAgentDevice: UserAgentDevice;
+
   createdAt: string;
   /** True when the hit came from an ignored IP. */
   ignored: boolean;
@@ -48,6 +58,19 @@ export interface LogFileResponse {
   log: LogFileInfo;
   lines: number;
   content: string;
+}
+
+export interface LogSearchHit {
+  file: string;
+  line: string;
+}
+
+export interface LogSearchResponse {
+  terms: string[];
+  hits: LogSearchHit[];
+  /** True when the hit or scan limit cut the search short. */
+  truncated: boolean;
+  filesScanned: number;
 }
 
 export interface DashboardWarning {

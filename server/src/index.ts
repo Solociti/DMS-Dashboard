@@ -8,7 +8,6 @@ import { deleteExpiredSessions } from "./auth";
 import { loadConfig, type AppConfig } from "./config";
 import { createDatabase, ensureDatabaseDirectory, runMigrations } from "./db";
 import { ensureTrackingFilter } from "./dms";
-import type { LogRegistry } from "./logs";
 import { WarningStore } from "./warnings";
 
 export {
@@ -20,7 +19,7 @@ export {
   runMigrations,
   WarningStore,
 };
-export type { AppConfig, LogRegistry };
+export type { AppConfig };
 
 export async function createServerApplication(
   config: AppConfig = loadConfig(),
@@ -41,7 +40,7 @@ export async function createServerApplication(
   const warningStore = new WarningStore(config);
   await warningStore.refresh();
 
-  const app = createApp(config, database, config.logFiles, warningStore);
+  const app = createApp(config, database, warningStore);
   return { app, database, warningStore };
 }
 

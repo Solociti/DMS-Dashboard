@@ -1,16 +1,30 @@
 import type { RequestHandler, Router } from "express";
 
-import { getLogRouteParam } from "./helpers";
-import { listLogFiles, readLogFile, type LogRegistry } from "../../logs";
+import { getLogRouteParam, parseSearchTerms } from "./helpers";
+import { listLogFiles, readLogFile, searchLogs } from "../../logs";
 
 export default function registerLogs(
   router: Router,
-  logRegistry: LogRegistry,
+  logDir: string,
   rateLimiter: RequestHandler,
 ): void {
   router.get("/", rateLimiter, async (_request, response, next) => {
     try {
-      response.json(await listLogFiles(logRegistry));
+      response.json(await listLogFiles(logDir));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/search", rateLimiter, async (request, response, next) => {
+    try {
+      const terms = parseSearchTerms(request.query.q);
+      if (!terms) {
+        response.status(400).json({ error: "Invalid search query" });
+        return;
+      }
+
+      response.json(await searchLogs(logDir, terms));
     } catch (error) {
       next(error);
     }
@@ -25,7 +39,7 @@ export default function registerLogs(
         return;
       }
 
-      response.json(await readLogFile(logRegistry, logName, lines));
+      response.json(await readLogFile(logDir, logName, lines));
     } catch (error) {
       next(error);
     }

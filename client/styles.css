@@ -16,6 +16,13 @@ body {
 .stack > * {
   min-width: 0;
 }
+
+hr {
+  border: none;
+  border-top: 1px solid rgba(84, 125, 168, 0.25);
+  margin: 1rem 0;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -152,7 +159,7 @@ button:hover {
 }
 .subtitle,
 .muted {
-  color: #9ab3cc;
+  color: #9ab3cc !important;
   margin: 0;
 }
 .hero-pixel {
@@ -314,6 +321,13 @@ tbody tr:hover,
   padding: 0.85rem 1rem;
   text-align: left;
 }
+
+.details-list .device-info {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .message-info {
   margin-bottom: 1rem;
   padding: 1rem;
@@ -340,9 +354,6 @@ tbody tr:hover,
   overflow-wrap: anywhere;
 }
 .message-info-id {
-  margin: 0.75rem 0 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(84, 125, 168, 0.2);
   color: #9ab3cc;
   font-family: ui-monospace, monospace;
   font-size: 0.8rem;
@@ -595,4 +606,15 @@ button:disabled {
 .cursor-pointer {
   cursor: pointer;
   user-select: none;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(84, 125, 168, 0.25);
+  color: #e5eef8;
+  font-size: 0.85rem;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
 }

@@ -1,6 +1,16 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+interface ModalEnvironment {
+  appRoot: HTMLElement | null;
+  rootWasInert: boolean;
+  bodyOverflow: string;
+  documentOverflow: string;
+}
+
+const modalStack: symbol[] = [];
+let modalEnvironment: ModalEnvironment | null = null;
+
 interface ModalProps {
   /**
    * Heading shown in the modal header.
@@ -25,29 +35,55 @@ interface ModalProps {
  */
 export default function Modal({ title, onClose, children }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const modalId = useRef(Symbol());
 
   useEffect(() => {
-    const appRoot = document.getElementById("root");
     const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    const previousRootOverflow = document.documentElement.style.overflow;
 
-    appRoot?.setAttribute("inert", "");
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
+    if (modalStack.length === 0) {
+      const appRoot = document.getElementById("root");
+      modalEnvironment = {
+        appRoot,
+        rootWasInert: appRoot?.hasAttribute("inert") ?? false,
+        bodyOverflow: document.body.style.overflow,
+        documentOverflow: document.documentElement.style.overflow,
+      };
+
+      appRoot?.setAttribute("inert", "");
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+    }
+
+    modalStack.push(modalId.current);
     dialogRef.current?.focus();
 
     return () => {
-      appRoot?.removeAttribute("inert");
-      document.body.style.overflow = previousOverflow;
-      document.documentElement.style.overflow = previousRootOverflow;
+      const stackIndex = modalStack.indexOf(modalId.current);
+      if (stackIndex !== -1) {
+        modalStack.splice(stackIndex, 1);
+      }
+
+      if (modalStack.length === 0 && modalEnvironment) {
+        const { appRoot, rootWasInert, bodyOverflow, documentOverflow } =
+          modalEnvironment;
+        if (!rootWasInert) {
+          appRoot?.removeAttribute("inert");
+        }
+        document.body.style.overflow = bodyOverflow;
+        document.documentElement.style.overflow = documentOverflow;
+        modalEnvironment = null;
+      }
+
       previousFocus?.focus();
     };
   }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (
+        event.key === "Escape" &&
+        modalStack[modalStack.length - 1] === modalId.current
+      ) {
         onClose();
       }
     };

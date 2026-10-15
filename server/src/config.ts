@@ -12,7 +12,7 @@ export interface AppConfig {
   trackingLuaSourcePath: string;
   publicRoot: string;
   publicDistRoot: string;
-  logFiles: Record<string, string>;
+  logDir: string;
 }
 
 function parseNumber(value: string | undefined, fallback: number): number {
@@ -51,33 +51,6 @@ function parseTrackingBaseUrl(value: string | undefined): string | null {
   return trimmed.replace(/\/$/, '');
 }
 
-function parseLogFiles(raw: string | undefined, dmsRoot: string): Record<string, string> {
-  if (!raw) {
-    return {
-      rspamd: path.join(dmsRoot, 'logs', 'rspamd.log'),
-      mail: path.join(dmsRoot, 'logs', 'mail.log')
-    };
-  }
-
-  return raw
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .reduce<Record<string, string>>((accumulator, entry) => {
-      const separatorIndex = entry.indexOf(':');
-      if (separatorIndex <= 0) {
-        return accumulator;
-      }
-
-      const name = entry.slice(0, separatorIndex).trim();
-      const filePath = entry.slice(separatorIndex + 1).trim();
-      if (name && filePath) {
-        accumulator[name] = filePath;
-      }
-      return accumulator;
-    }, {});
-}
-
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppConfig {
   const appRoot = process.cwd();
   const dmsRoot = environment.DMS_ROOT || '/dms';
@@ -95,6 +68,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     trackingLuaSourcePath: path.join(appRoot, 'dms', 'rspamd.local.lua'),
     publicRoot: path.join(appRoot, 'public'),
     publicDistRoot: path.join(appRoot, 'public', 'dist'),
-    logFiles: parseLogFiles(environment.LOG_FILES, dmsRoot)
+    logDir: environment.LOG_DIR || path.join(dmsRoot, 'logs')
   };
 }

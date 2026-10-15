@@ -3,6 +3,7 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const zlib = require("node:zlib");
 
 const {
   createServerApplication,
@@ -206,7 +207,7 @@ test("warning API reports missing tracking base URL and skips filter install", a
     trackingLuaSourcePath: luaSource,
     publicRoot: publicDir,
     publicDistRoot: publicDistDir,
-    logFiles: {},
+    logDir: path.join(dmsRoot, "logs"),
   });
 
   const server = await new Promise((resolve) => {
@@ -369,7 +370,7 @@ test("warning recheck clears missing directory warning and installs the filter",
     trackingLuaSourcePath: luaSource,
     publicRoot: publicDir,
     publicDistRoot: publicDistDir,
-    logFiles: {},
+    logDir: path.join(dmsRoot, "logs"),
   });
 
   const server = await new Promise((resolve) => {
@@ -436,7 +437,7 @@ test("tracking blacklist API validates and persists sender addresses", async () 
     trackingLuaSourcePath: luaSource,
     publicRoot: publicDir,
     publicDistRoot: publicDistDir,
-    logFiles: {},
+    logDir: path.join(root, "logs"),
   });
 
   const server = await new Promise((resolve) => {
@@ -529,6 +530,10 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
     "<!doctype html><title>ok</title>",
   );
   await fs.writeFile(logPath, "first\nsecond\nthird\n");
+  await fs.writeFile(
+    path.join(path.dirname(logPath), "old.log.1.gz"),
+    zlib.gzipSync("zipped first\nzipped second\n"),
+  );
 
   const { app, database } = await createServerApplication({
     appRoot: root,
@@ -542,7 +547,7 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
     trackingLuaSourcePath: luaSource,
     publicRoot: publicDir,
     publicDistRoot: publicDistDir,
-    logFiles: { rspamd: logPath },
+    logDir: path.dirname(logPath),
   });
 
   const server = await new Promise((resolve) => {
@@ -592,7 +597,7 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
       return payload.length ? payload : null;
     });
     assert.equal(summaries.length, 1);
-    assert.equal(summaries[0].msgId, "message-123");
+    assert.equal(summaries[0].uid, "message-123");
     assert.equal(summaries[0].totalOpens, 1);
     assert.equal(summaries[0].sentAt, sentAt);
     assert.equal(summaries[0].subject, "Sent date test");
@@ -602,7 +607,7 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
         `${baseUrl}/api/opens/message-123`,
         cookie,
       );
-      const payload = await response.json();
+      const payload = (await response.json()).list;
       return payload.length ? payload : null;
     });
     assert.equal(entries.length, 1);
@@ -610,13 +615,51 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
     assert.equal(entries[0].userAgent, "Node Test Agent");
 
     const logs = await (await authFetch(`${baseUrl}/api/logs`, cookie)).json();
-    assert.equal(logs.length, 1);
-    assert.equal(logs[0].name, "rspamd");
+    assert.equal(logs.length, 2);
+    assert.deepEqual(logs.map((log) => log.name).sort(), [
+      "old.log.1.gz",
+      "rspamd.log",
+    ]);
 
     const logContent = await (
-      await authFetch(`${baseUrl}/api/logs/rspamd?lines=2`, cookie)
+      await authFetch(`${baseUrl}/api/logs/rspamd.log?lines=2`, cookie)
     ).json();
     assert.equal(logContent.content, "second\nthird");
+
+    const gzContent = await (
+      await authFetch(`${baseUrl}/api/logs/old.log.1.gz?lines=1`, cookie)
+    ).json();
+    assert.equal(gzContent.content, "zipped second");
+
+    const search = await (
+      await authFetch(
+        `${baseUrl}/api/logs/search?q=${encodeURIComponent("second|zipped first")}`,
+        cookie,
+      )
+    ).json();
+    assert.deepEqual(search.hits.map((hit) => hit.line).sort(), [
+      "second",
+      "zipped first",
+      "zipped second",
+    ]);
+    assert.equal(search.truncated, false);
+
+    for (const query of ["", "%7C", "a".repeat(257)]) {
+      const bad = await authFetch(
+        `${baseUrl}/api/logs/search?q=${query}`,
+        cookie,
+      );
+      assert.equal(bad.status, 400);
+    }
+
+    const unauthenticated = await fetch(`${baseUrl}/api/logs/search?q=second`);
+    assert.equal(unauthenticated.status, 401);
+
+    const traversal = await authFetch(
+      `${baseUrl}/api/logs/${encodeURIComponent("../rspamd.log")}`,
+      cookie,
+    );
+    assert.equal(traversal.status, 404);
 
     const missingLogResponse = await authFetch(
       `${baseUrl}/api/logs/unknown`,
@@ -662,7 +705,7 @@ test("opens API filters, sorts and hides ignored IPs", async () => {
     trackingLuaSourcePath: luaSource,
     publicRoot: publicDir,
     publicDistRoot: publicDistDir,
-    logFiles: { rspamd: logPath },
+    logDir: path.dirname(logPath),
   });
 
   const server = await new Promise((resolve) => {
@@ -674,24 +717,54 @@ test("opens API filters, sorts and hides ignored IPs", async () => {
     const cookie = await authenticateAdmin(baseUrl);
 
     await database("messages").insert([
-      { uid: "a", subject: "Invoice", sender: "admin@example.com", recipients: "[]", sent_at: "2026-10-01T00:00:00.000Z" },
-      { uid: "b", subject: "Hello", sender: "other@example.com", recipients: "[]", sent_at: "2026-10-02T00:00:00.000Z" },
-      { uid: "c", subject: "Unopened", sender: "admin@example.com", recipients: "[]", sent_at: "2026-10-03T00:00:00.000Z" },
+      {
+        uid: "a",
+        subject: "Invoice",
+        sender: "admin@example.com",
+        recipients: "[]",
+        sent_at: "2026-10-01T00:00:00.000Z",
+      },
+      {
+        uid: "b",
+        subject: "Hello",
+        sender: "other@example.com",
+        recipients: "[]",
+        sent_at: "2026-10-02T00:00:00.000Z",
+      },
+      {
+        uid: "c",
+        subject: "Unopened",
+        sender: "admin@example.com",
+        recipients: "[]",
+        sent_at: "2026-10-03T00:00:00.000Z",
+      },
     ]);
-    for (const [id, ip] of [["a", "203.0.113.10"], ["b", "198.51.100.7"]]) {
-      await fetch(`${baseUrl}/open/${id}.png`, { headers: { "x-forwarded-for": ip } });
+    for (const [id, ip] of [
+      ["a", "203.0.113.10"],
+      ["b", "198.51.100.7"],
+    ]) {
+      await fetch(`${baseUrl}/open/${id}.png`, {
+        headers: { "x-forwarded-for": ip },
+      });
     }
-    await waitFor(async () => (await database("messages").where("open_count", ">", 0)).length === 2);
+    await waitFor(
+      async () =>
+        (await database("messages").where("open_count", ">", 0)).length === 2,
+    );
 
     const list = async (query) =>
-      (await (await authFetch(`${baseUrl}/api/opens?${query}`, cookie)).json()).items.map((row) => row.msgId);
+      (
+        await (await authFetch(`${baseUrl}/api/opens?${query}`, cookie)).json()
+      ).items.map((row) => row.uid);
 
     assert.deepEqual(await list("sort=sent&dir=asc"), ["a", "b", "c"]);
     assert.deepEqual(await list("sort=sent&dir=desc"), ["c", "b", "a"]);
     assert.deepEqual(await list("scope=mine&sort=sent&dir=asc"), ["a", "c"]);
     assert.deepEqual(await list("q=hello"), ["b"]);
 
-    const unopened = (await (await authFetch(`${baseUrl}/api/opens?q=Unopened`, cookie)).json()).items[0];
+    const unopened = (
+      await (await authFetch(`${baseUrl}/api/opens?q=Unopened`, cookie)).json()
+    ).items[0];
     assert.equal(unopened.totalOpens, 0);
     assert.equal(unopened.lastOpened, null);
 
@@ -711,14 +784,20 @@ test("opens API filters, sorts and hides ignored IPs", async () => {
     ).json();
     assert.deepEqual(added.ips, [{ ip: "203.0.113.10", note: "Home" }]);
     assert.deepEqual((await list("sort=sent&dir=asc")).length, 3);
-    const counts = (await (await authFetch(`${baseUrl}/api/opens?scope=all`, cookie)).json()).totalOpens;
+    const counts = (
+      await (await authFetch(`${baseUrl}/api/opens?scope=all`, cookie)).json()
+    ).totalOpens;
     assert.equal(counts, 1);
 
-    const hidden = await (await authFetch(`${baseUrl}/api/opens/a`, cookie)).json();
-    assert.equal(hidden.length, 0);
-    const shown = await (await authFetch(`${baseUrl}/api/opens/a?includeIgnored=1`, cookie)).json();
-    assert.equal(shown.length, 1);
-    assert.equal(shown[0].ignored, true);
+    const hidden = await (
+      await authFetch(`${baseUrl}/api/opens/a`, cookie)
+    ).json();
+    assert.equal(hidden.list.length, 0);
+    const shown = await (
+      await authFetch(`${baseUrl}/api/opens/a?includeIgnored=1`, cookie)
+    ).json();
+    assert.equal(shown.list.length, 1);
+    assert.equal(shown.list[0].ignored, true);
 
     const removed = await (
       await authFetch(`${baseUrl}/api/ignored-ips/203.0.113.10`, cookie, {
@@ -726,7 +805,11 @@ test("opens API filters, sorts and hides ignored IPs", async () => {
       })
     ).json();
     assert.deepEqual(removed.ips, []);
-    assert.equal((await authFetch(`${baseUrl}/api/opens`, cookie).then((r) => r.json())).totalOpens, 2);
+    assert.equal(
+      (await authFetch(`${baseUrl}/api/opens`, cookie).then((r) => r.json()))
+        .totalOpens,
+      2,
+    );
   } finally {
     await new Promise((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

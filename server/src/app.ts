@@ -7,7 +7,6 @@ import { createApiRateLimiters } from "./api/rate-limits";
 import { recordOpenHit } from "./api/opens/counts";
 import { getAuthenticatedUser } from "./auth";
 import type { AppConfig } from "./config";
-import type { LogRegistry } from "./logs";
 import { WarningStore } from "./warnings";
 
 const dashboardIndexPath = "index.html";
@@ -31,7 +30,6 @@ export function getClientIp(request: Request): string | null {
 export function createApp(
   config: AppConfig,
   database: Knex,
-  logRegistry: LogRegistry,
   warningStore: WarningStore,
 ): express.Express {
   const app = express();
@@ -63,7 +61,7 @@ export function createApp(
 
   app.use(
     "/api",
-    registerApi({ config, database, logRegistry, warningStore }, limiters),
+    registerApi({ config, database, warningStore }, limiters),
   );
 
   app.get("/", (_request: Request, response: Response) => {

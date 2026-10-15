@@ -32,7 +32,8 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^8.4.0",
-    "sqlite3": "6.0.1"
+    "sqlite3": "6.0.1",
+    "ua-parser-js": "^2.0.10"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

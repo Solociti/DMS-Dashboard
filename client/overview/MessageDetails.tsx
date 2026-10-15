@@ -5,6 +5,7 @@ import { fetchJson } from "../shared/fetchJson";
 import { formatDate } from "../shared/formatDate";
 import { getErrorMessage } from "../shared/getErrorMessage";
 import MessageInfo from "./MessageInfo";
+import MessageLogsModal from "./MessageLogsModal";
 
 interface MessageDetailsProps {
   /**
@@ -48,6 +49,8 @@ export default function MessageDetails({
   const [entries, setEntries] = useState<OpenLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showIgnored, setShowIgnored] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+  const [counts, setCounts] = useState({ total: 0, visible: 0 });
 
   useEffect(() => {
     if (!msgId) {
@@ -58,12 +61,14 @@ export default function MessageDetails({
     let cancelled = false;
     const suffix = showIgnored ? "?includeIgnored=1" : "";
 
-    fetchJson<OpenLogEntry[]>(
-      `/api/opens/${encodeURIComponent(msgId)}${suffix}`,
-    )
+    fetchJson<{
+      list: OpenLogEntry[];
+      count: { total: number; visible: number };
+    }>(`/api/opens/${encodeURIComponent(msgId)}${suffix}`)
       .then((next) => {
         if (!cancelled) {
-          setEntries(next);
+          setEntries(next.list);
+          setCounts(next.count);
           setError(null);
         }
       })
@@ -78,29 +83,51 @@ export default function MessageDetails({
     };
   }, [msgId, version, showIgnored]);
 
-  const visibleCount = entries.filter((entry) => !entry.ignored).length;
-  const ignoredCount = entries.length - visibleCount;
-
-  const title = loadFailed
+  const issueTitle = loadFailed
     ? "Overview failed to load"
     : msgId
-      ? `${visibleCount} open${visibleCount === 1 ? "" : "s"}${showIgnored ? ` • ${ignoredCount} ignored` : ""}`
+      ? ``
       : "Select a message to inspect open events.";
 
   return (
     <section className="panel inset">
       <div className="panel-heading">
-        {hideHeading ? null : <h2>Open Details</h2>}
-        <p>{title}</p>
+        {hideHeading ? null : (
+          <h2
+            style={{
+              display: "inline-block",
+              marginBottom: 0,
+            }}
+          >
+            Open Details
+          </h2>
+        )}
+
+        <div>
+          {msgId && counts.total > counts.visible ? (
+            <button
+              type="button"
+              onClick={() => setShowIgnored((value) => !value)}
+            >
+              {showIgnored ? "Hide ignored hits" : "Show ignored hits"}
+            </button>
+          ) : null}
+          {message ? (
+            <button type="button" onClick={() => setShowLogs(true)}>
+              Show logs
+            </button>
+          ) : null}
+        </div>
+
+        {msgId ? (
+          <span>
+            {counts.visible} of {counts.total}
+          </span>
+        ) : null}
       </div>
 
+      <p>{issueTitle}</p>
       {message ? <MessageInfo message={message} /> : null}
-
-      {msgId ? (
-        <button type="button" onClick={() => setShowIgnored((value) => !value)}>
-          {showIgnored ? "Hide ignored hits" : "Show ignored hits"}
-        </button>
-      ) : null}
 
       <ul className="details-list">
         {error ? <li>{error}</li> : null}
@@ -112,14 +139,56 @@ export default function MessageDetails({
           entries.map((entry) => (
             <li key={entry.id} className={entry.ignored ? "muted" : undefined}>
               <strong>{formatDate(entry.createdAt)}</strong>
-              {entry.ignored ? " (ignored)" : null}
+              {entry.ignored ? (
+                <span
+                  className="badge"
+                  style={{ marginLeft: "0.5rem", fontSize: "0.9em" }}
+                >
+                  ignored
+                </span>
+              ) : null}
               <br />
-              <span>IP: {entry.ipAddress ?? "Unknown"}</span>
-              <br />
-              <span>User-Agent: {entry.userAgent ?? "Unknown"}</span>
+
+              <dl className="message-info-fields">
+                <dt>IP</dt>
+                <dd>{entry.ipAddress ?? "-"}</dd>
+
+                <dt>User-Agent</dt>
+                <dd>{entry.userAgent ?? "-"}</dd>
+              </dl>
+
+              {entry.userAgentDevice &&
+              (entry.userAgentDevice.browser ||
+                entry.userAgentDevice.device ||
+                entry.userAgentDevice.os) ? (
+                <>
+                  <hr />
+                  <div className="device-info">
+                    {entry.userAgentDevice.browser && (
+                      <div className="badge">
+                        Browser: {entry.userAgentDevice.browser}
+                      </div>
+                    )}
+                    {entry.userAgentDevice.device && (
+                      <div className="badge">
+                        Device: {entry.userAgentDevice.device}
+                      </div>
+                    )}
+                    {entry.userAgentDevice.os && (
+                      <div className="badge">
+                        OS: {entry.userAgentDevice.os}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
             </li>
           ))}
       </ul>
+
+      {showLogs && message ? (
+        <MessageLogsModal message={message} onClose={() => setShowLogs(false)} />
+      ) : null}
     </section>
   );
 }

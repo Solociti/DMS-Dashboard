@@ -24,7 +24,7 @@ export default function LogsPage() {
 
         if (next.length === 0) {
           setError(
-            "Configure LOG_FILES or mount DMS logs to inspect them here.",
+            "Configure LOG_DIR or mount DMS logs to inspect them here.",
           );
         } else {
           setError(null);

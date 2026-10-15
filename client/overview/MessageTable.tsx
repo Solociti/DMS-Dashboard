@@ -112,14 +112,14 @@ export default function MessageTable({
   const MessageRow = ({ row }: { row: OpenSummary }) => {
     const title =
       !row.subject && !row.sender && row.recipients.length === 0 && !row.sentAt
-        ? row.msgId
+        ? row.uid
         : (row.subject ?? "(no subject)");
     const recipients = row.recipients.join(", ");
 
     return (
       <tr
-        className={row.msgId === selectedId ? "active" : undefined}
-        onClick={() => onSelect(row.msgId)}
+        className={row.uid === selectedId ? "active" : undefined}
+        onClick={() => onSelect(row.uid)}
       >
         <td title={title}>
           <strong>{truncate(title)}</strong>
@@ -214,7 +214,7 @@ export default function MessageTable({
               <Message text="No tracking data yet." />
             ) : null}
             {!error &&
-              rows?.map((row) => <MessageRow key={row.msgId} row={row} />)}
+              rows?.map((row) => <MessageRow key={row.uid} row={row} />)}
           </tbody>
         </table>
       </div>
