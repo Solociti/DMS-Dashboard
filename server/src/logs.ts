@@ -49,7 +49,15 @@ function openLines(filePath: string): readline.Interface {
   // Errors on the source are not forwarded by pipe().
   source.on('error', (error) => input.destroy(error));
 
-  return readline.createInterface({ input, crlfDelay: Infinity });
+  const lines = readline.createInterface({ input, crlfDelay: Infinity });
+  lines.on('close', () => {
+    input.destroy();
+    if (source !== input) {
+      source.destroy();
+    }
+  });
+
+  return lines;
 }
 
 async function readGzipTail(filePath: string, safeLines: number): Promise<string> {
