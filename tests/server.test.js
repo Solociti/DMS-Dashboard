@@ -597,7 +597,7 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
       return payload.length ? payload : null;
     });
     assert.equal(summaries.length, 1);
-    assert.equal(summaries[0].msgId, "message-123");
+    assert.equal(summaries[0].uid, "message-123");
     assert.equal(summaries[0].totalOpens, 1);
     assert.equal(summaries[0].sentAt, sentAt);
     assert.equal(summaries[0].subject, "Sent date test");
@@ -607,7 +607,7 @@ test("tracking pixel endpoint records opens and returns a png", async () => {
         `${baseUrl}/api/opens/message-123`,
         cookie,
       );
-      const payload = await response.json();
+      const payload = (await response.json()).list;
       return payload.length ? payload : null;
     });
     assert.equal(entries.length, 1);
@@ -755,7 +755,7 @@ test("opens API filters, sorts and hides ignored IPs", async () => {
     const list = async (query) =>
       (
         await (await authFetch(`${baseUrl}/api/opens?${query}`, cookie)).json()
-      ).items.map((row) => row.msgId);
+      ).items.map((row) => row.uid);
 
     assert.deepEqual(await list("sort=sent&dir=asc"), ["a", "b", "c"]);
     assert.deepEqual(await list("sort=sent&dir=desc"), ["c", "b", "a"]);
@@ -792,12 +792,12 @@ test("opens API filters, sorts and hides ignored IPs", async () => {
     const hidden = await (
       await authFetch(`${baseUrl}/api/opens/a`, cookie)
     ).json();
-    assert.equal(hidden.length, 0);
+    assert.equal(hidden.list.length, 0);
     const shown = await (
       await authFetch(`${baseUrl}/api/opens/a?includeIgnored=1`, cookie)
     ).json();
-    assert.equal(shown.length, 1);
-    assert.equal(shown[0].ignored, true);
+    assert.equal(shown.list.length, 1);
+    assert.equal(shown.list[0].ignored, true);
 
     const removed = await (
       await authFetch(`${baseUrl}/api/ignored-ips/203.0.113.10`, cookie, {
